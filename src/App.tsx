@@ -17,7 +17,7 @@ const PROBLEM = 'P02'
 const ESCALATE_COOLDOWN_MS = 30_000
 const SNOOZE_MS = 10 * 60_000
 const MODE: 'scaffold' | 'baseline' = import.meta.env.VITE_TUTOR_MODE === 'scaffold' ? 'scaffold' : 'baseline'
-const MODEL: string = import.meta.env.VITE_OLLAMA_MODEL || 'qwen2.5-coder:7b'
+const MODEL: string = import.meta.env.VITE_OLLAMA_MODEL || 'qwen2.5-coder:1.5b'
 // PoC-lite: hide everything that implies a finished subsystem. Set VITE_UI=full to see the full shell.
 const LITE: boolean = import.meta.env.VITE_UI !== 'full'
 const provider: HintProvider = MODE === 'scaffold' ? new MockHintProvider() : new OllamaBaselineProvider(MODEL)
