@@ -1,6 +1,14 @@
-type Props = { lab: string; title: string; hintLabel: string; onRun: () => void; onHint: () => void }
+type Props = {
+  lab: string
+  title: string
+  hintLabel: string
+  onRun: () => void
+  onHint: () => void
+  onSubmit?: () => void
+  submitState?: 'idle' | 'saved'
+}
 
-export function Header({ lab, title, hintLabel, onRun, onHint }: Props) {
+export function Header({ lab, title, hintLabel, onRun, onHint, onSubmit, submitState = 'idle' }: Props) {
   return (
     <header className="hdr">
       <div className="brand">
@@ -12,6 +20,11 @@ export function Header({ lab, title, hintLabel, onRun, onHint }: Props) {
           <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4 2.5v11l9-5.5z" /></svg>
           Run <kbd>⌘↵</kbd>
         </button>
+        {onSubmit && (
+          <button className="btn" onClick={onSubmit} title="Submit this attempt to your instructor" data-testid="submit-attempt">
+            {submitState === 'saved' ? 'Submitted' : 'Submit'}
+          </button>
+        )}
         <button className="btn accent" onClick={onHint} title="Open the tutor">
           {hintLabel} <kbd>⌘I</kbd>
         </button>

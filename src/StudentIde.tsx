@@ -5,14 +5,15 @@ import { CodeEditor, type EditorActions } from './components/CodeEditor'
 import { OutputPanel } from './components/OutputPanel'
 import { TutorPanel, type HintCard } from './components/TutorPanel'
 import { StatusBar, type Nudge } from './components/StatusBar'
-import { problems, type Problem } from './data/problems'
+import { problems, registerLabProblem, type Problem } from './data/problems'
 import { mockRun, type RunResult } from './mock/compiler'
 import { MockHintProvider } from './providers/MockHintProvider'
 import { OllamaBaselineProvider } from './providers/OllamaBaselineProvider'
 import type { HintProvider } from './providers/HintProvider'
 import { useCourse } from './state/useCourse'
+import { ManualViewer } from './components/ManualViewer'
 import { mockData } from './mock/data'
-import type { ContextMode, HintResponse, KnowledgeComponentId, Level, ProfileMode, PromptVariant, StruggleSignal, TelemetryEvent } from './types'
+import type { ContextMode, HintResponse, KnowledgeComponentId, Level, ManualMeta, ProfileMode, PromptVariant, StruggleSignal, TelemetryEvent } from './types'
 import prompts from './providers/prompts.json'
 
 const PROBLEM = 'P02'
@@ -34,25 +35,43 @@ const LITE: boolean = import.meta.env.VITE_UI !== 'full'
 
 export default function StudentIde() {
   const baseProblem = problems[PROBLEM]
-  const { currentLab, currentPolicy, manuals } = useCourse()
-  const p: Problem = useMemo(() => {
-    if (!currentLab) return baseProblem
-    return {
-      ...baseProblem,
-      // The id stays the built-in problem's: a lab authored in the console carries a
-      // statement and starter code, and borrows this problem's hint ladder, tests and
-      // guardrail comparator. Providers look the problem up by this id.
-      id: baseProblem.id,
-      examples: [],
-      lab: `Lab ${currentLab.number}`,
-      title: currentLab.title,
-      statement: currentLab.statement,
-      constraints: currentLab.kcIds.map((kcId) => `Practice ${kcId.replaceAll('-', ' ')}`),
-      concepts: currentLab.kcIds.map((kcId) => ({ name: kcId.replaceAll('-', ' '), mastery: 0.42 })),
-      starter: currentLab.starterCode,
-    }
-  }, [baseProblem, currentLab])
-  const activeManuals = currentLab ? manuals.filter((manual) => currentLab.manualIds.includes(manual.id)) : []
+  const { labs, currentLab, currentPolicy, manuals, manualFiles, policies, sessionSubmissions, submitAttempt, logHint } = useCourse()
+  // The student's own lab list: everything the instructor has opened or closed.
+  const assignedLabs = useMemo(() => (
+    labs.filter((lab) => lab.status !== 'draft').sort((a, b) => b.number - a.number)
+  ), [labs])
+  // The student may browse their own labs, but a lab the instructor pushes wins:
+  // a pick is remembered against the lab that was pushed when it was made, so the
+  // next push discards it. Derived, so no effect has to chase the instructor.
+  const pushedLabId = currentLab?.id ?? ''
+  const [pick, setPick] = useState<{ labId: string; against: string } | null>(null)
+  const selectedLabId = pick && pick.against === pushedLabId ? pick.labId : pushedLabId
+  const selectLab = useCallback(
+    (labId: string) => setPick({ labId, against: pushedLabId }),
+    [pushedLabId],
+  )
+  const activeLab = useMemo(
+    () => assignedLabs.find((lab) => lab.id === selectedLabId) ?? null,
+    [assignedLabs, selectedLabId],
+  )
+  const p: Problem = useMemo(
+    () => (activeLab ? registerLabProblem(activeLab) : baseProblem),
+    [activeLab, baseProblem],
+  )
+  const activeManuals = activeLab ? manuals.filter((manual) => activeLab.manualIds.includes(manual.id)) : []
+  const activePolicy = activeLab
+    ? policies.find((policy) => policy.labId === activeLab.id) ?? currentPolicy
+    : null
+  const [openManual, setOpenManual] = useState<ManualMeta | null>(null)
+  const [submitState, setSubmitState] = useState<'idle' | 'saved'>('idle')
+  const startedAt = useRef(0)
+  const attempts = useMemo(() => {
+    if (!activeLab) return []
+    return [
+      ...mockData.submissions.filter((row) => row.studentId === DEMO_STUDENT_ID && row.labId === activeLab.id),
+      ...sessionSubmissions.filter((row) => row.labId === activeLab.id),
+    ].sort((a, b) => a.timestamp.localeCompare(b.timestamp))
+  }, [activeLab, sessionSubmissions])
   const [mode, setMode] = useState<'scaffold' | 'baseline'>(INITIAL_MODE)
   const [code, setCode] = useState(p.starter)
   const [cursor, setCursor] = useState({ ln: 1, col: 1 })
@@ -82,10 +101,10 @@ export default function StudentIde() {
     () => (mode === 'scaffold' ? new MockHintProvider() : new OllamaBaselineProvider(model)),
     [mode, model],
   )
-  const similarityThreshold = currentPolicy?.similarityThreshold ?? 0.6
+  const similarityThreshold = activePolicy?.similarityThreshold ?? 0.6
   // The student's own concept estimates, with the uncertainty band the instructor sees.
   const masteryBars = useMemo(() => {
-    const kcIds = currentLab?.kcIds.length ? currentLab.kcIds : DEFAULT_KC_IDS
+    const kcIds = activeLab?.kcIds.length ? activeLab.kcIds : DEFAULT_KC_IDS
     return kcIds.flatMap((kcId) => {
       const trace = mockData.masteryTraces.find((item) => item.studentId === DEMO_STUDENT_ID && item.kcId === kcId)
       const kc = mockData.knowledgeComponents.find((item) => item.id === kcId)
@@ -93,7 +112,7 @@ export default function StudentIde() {
       const point = trace.telemetryAdjusted[trace.telemetryAdjusted.length - 1]
       return [{ id: kc.id, label: kc.name, value: point.value, low: point.uncertaintyLow, high: point.uncertaintyHigh }]
     })
-  }, [currentLab])
+  }, [activeLab])
   const telemetry = useRef<TelemetryEvent[]>([])
   const nextId = useRef(1)
 
@@ -109,19 +128,19 @@ export default function StudentIde() {
 
   const mastery = useMemo(() => Object.fromEntries(p.concepts.map((c) => [c.name.toLowerCase(), c.mastery])), [p])
   const currentLevel: Level = cards.length ? cards[cards.length - 1].level : 0
-  const maxHintLevel = currentPolicy?.maxHintLevel ?? 4
+  const maxHintLevel = activePolicy?.maxHintLevel ?? 4
 
   // Escalation gate: one level per edit or run, plus a cooldown.
   const canEscalate = useMemo(() => {
     if (mode === 'baseline') return { ok: false, why: '' }
-    if (currentPolicy && !currentPolicy.escalationAllowed) return { ok: false, why: 'Instructor has paused escalation for this lab' }
+    if (activePolicy && !activePolicy.escalationAllowed) return { ok: false, why: 'Instructor has paused escalation for this lab' }
     if (cards.length === 0) return { ok: false, why: 'Ask for a hint first' }
     if (currentLevel >= maxHintLevel) return { ok: false, why: `Available up to Level ${maxHintLevel}` }
     if (!activitySinceHint) return { ok: false, why: 'Edit your code or run it before asking for more' }
     const left = Math.ceil((lastHintAt + ESCALATE_COOLDOWN_MS - now) / 1000)
     if (left > 0) return { ok: false, why: `Available in ${left}s` }
     return { ok: true, why: '' }
-  }, [cards.length, currentLevel, activitySinceHint, lastHintAt, now, currentPolicy, maxHintLevel, mode])
+  }, [cards.length, currentLevel, activitySinceHint, lastHintAt, now, activePolicy, maxHintLevel, mode])
 
   useEffect(() => {
     if (!tutorOpen) return
@@ -135,7 +154,31 @@ export default function StudentIde() {
     setRun(null)
     setOutputOpen(false)
     setHighlight(null)
+    setSubmitState('idle')
+    startedAt.current = Date.now()
   }, [p.id, p.starter])
+
+  // Submitting is the student's half of the loop the instructor console reads: the
+  // attempt shows up in Submissions and on their own detail screen, marked as this
+  // session so nobody mistakes it for seeded data.
+  const submit = useCallback(() => {
+    if (!activeLab) return
+    const result = run ?? mockRun(code, p)
+    if (!run) { setRun(result); setOutputOpen(true) }
+    const passed = result.tests.filter((test) => test.passed).length
+    submitAttempt({
+      studentId: DEMO_STUDENT_ID,
+      labId: activeLab.id,
+      code,
+      compileOk: !result.diagnostics.some((d) => d.severity === 'error'),
+      testsPassed: passed,
+      testsFailed: result.tests.length - passed,
+      timeOnTaskMin: Math.max(1, Math.round((Date.now() - (startedAt.current || Date.now())) / 60_000)),
+    })
+    log('submit', { labId: activeLab.id, testsPassed: passed })
+    setSubmitState('saved')
+    window.setTimeout(() => setSubmitState('idle'), 2500)
+  }, [activeLab, code, p, run, submitAttempt, log])
 
   const requestHint = useCallback(async (level: Level, trigger: HintCard['trigger'], question?: string) => {
     const requestedLevel = Math.min(level, maxHintLevel) as Level
@@ -166,10 +209,27 @@ export default function StudentIde() {
     setCards((cs) => (cs.some((c) => c.id === id)
       ? cs.map((c) => (c.id === id ? { ...c, ...res, streaming: false, question } : c))
       : [...cs, { ...res, id, trigger }]))
+    // Close the loop: what the guardrail decided here is what the instructor's
+    // Hint Audit shows, with the level, the measured similarity and the threshold.
+    if (mode === 'scaffold' && activeLab) {
+      const blocked = Boolean(res.guardrail?.blocked)
+      logHint({
+        studentId: DEMO_STUDENT_ID,
+        labId: activeLab.id,
+        level: res.level,
+        blocked,
+        similarity: res.guardrail?.similarity ?? 0,
+        threshold: res.guardrail?.threshold ?? similarityThreshold,
+        reason: res.guardrail?.reason ?? 'within lab disclosure policy',
+        promptContextSummary: `${p.title}: ${p.concepts.map((concept) => concept.name).join(', ')}`,
+        shownText: res.text,
+        withheldText: blocked ? 'A code-shaped answer with the missing step was withheld.' : undefined,
+      })
+    }
     if (res.highlightLines) setHighlight({ lines: res.highlightLines, message: res.text })
     setLastHintAt(Date.now())
     setActivitySinceHint(false)
-  }, [code, mastery, struggle, p.id, log, promptVariant, systemPrompt, model, context, profile, maxHintLevel, mode, provider, similarityThreshold])
+  }, [code, mastery, struggle, p, log, logHint, activeLab, promptVariant, systemPrompt, model, context, profile, maxHintLevel, mode, provider, similarityThreshold])
 
   const policyLevel = useCallback((): Level => {
     const level = cards.length ? currentLevel : failedRuns >= 3 ? 1 : 0
@@ -250,16 +310,29 @@ export default function StudentIde() {
 
   return (
     <div className="app" style={style}>
-      <Header lab={p.lab} title={p.title} hintLabel={mode === 'baseline' ? 'Ask' : 'Hint'} onRun={doRun} onHint={() => setTutorOpen((o) => !o)} />
+      <Header
+        lab={p.lab}
+        title={p.title}
+        hintLabel={mode === 'baseline' ? 'Ask' : 'Hint'}
+        onRun={doRun}
+        onHint={() => setTutorOpen((o) => !o)}
+        onSubmit={activeLab ? submit : undefined}
+        submitState={submitState}
+      />
       <div className="main">
         <ProblemPane
           p={p}
           collapsed={!problemOpen}
           lite={LITE}
           manuals={activeManuals}
-          policy={mode === 'scaffold' ? currentPolicy : null}
+          policy={mode === 'scaffold' ? activePolicy : null}
           mastery={mode === 'scaffold' ? masteryBars : []}
           recording={mode === 'scaffold'}
+          labs={assignedLabs}
+          selectedLabId={selectedLabId}
+          onSelectLab={selectLab}
+          attempts={attempts}
+          onOpenManual={setOpenManual}
         />
         <div className="center">
           <CodeEditor
@@ -271,7 +344,19 @@ export default function StudentIde() {
             lite={LITE}
           />
           {outputOpen && run && (
-            <OutputPanel tab={tab} setTab={setTab} diagnostics={run.diagnostics} explanations={explanations} tests={run.tests} onClose={() => setOutputOpen(false)} onJump={jump} lite={LITE} />
+            <OutputPanel
+              tab={tab}
+              setTab={setTab}
+              diagnostics={run.diagnostics}
+              explanations={explanations}
+              tests={run.tests}
+              onClose={() => setOutputOpen(false)}
+              onJump={jump}
+              // The bare PoC-lite output belongs to the baseline condition. The
+              // product tutor shows test results and the plain-English diagnostic,
+              // because the student is meant to act on them.
+              lite={LITE && mode === 'baseline'}
+            />
           )}
           {outputOpen && !run && <div />}
         </div>
@@ -303,6 +388,13 @@ export default function StudentIde() {
         )}
         {!tutorOpen && <div />}
       </div>
+      {openManual && (
+        <ManualViewer
+          manual={openManual}
+          file={manualFiles[openManual.id]}
+          onClose={() => setOpenManual(null)}
+        />
+      )}
       <StatusBar ln={cursor.ln} col={cursor.col} nudge={nudge} lite={LITE}
         onNudgeClick={() => (nudge === 'nudge' ? requestHint(policyLevel(), 'proactive') : setTutorOpen((o) => !o))}
         onSnooze={snooze} />
