@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { mockData } from '../mock/data'
 import { dayMonthTime } from './format'
-import { labShort, submissionRows, type SubmissionRow } from './selectors'
+import { labShort, submissionRows, submissionStats, type SubmissionRow } from './selectors'
+import { useCourse } from '../state/useCourse'
 import type { SubmissionStatus } from '../types'
 
 type SortKey = 'student' | 'lab' | 'timestamp' | 'tests' | 'time' | 'status'
@@ -98,7 +99,8 @@ function ExpandedRow({ row }: { row: SubmissionRow }) {
 }
 
 export function Submissions() {
-  const rows = useMemo(() => submissionRows(), [])
+  const { sessionSubmissions } = useCourse()
+  const rows = useMemo(() => submissionRows(sessionSubmissions), [sessionSubmissions])
   const [labId, setLabId] = useState('all')
   const [status, setStatus] = useState('all')
   const [minTests, setMinTests] = useState(0)
@@ -122,6 +124,8 @@ export function Submissions() {
     })
   }, [rows, labId, status, minTests, maxMinutes, sort])
 
+  const stats = useMemo(() => submissionStats(filtered), [filtered])
+
   const toggleSort = (key: SortKey) => {
     setSort((current) => (
       current.key === key
@@ -139,6 +143,33 @@ export function Submissions() {
         </div>
         <p>{filtered.length} of {rows.length} attempts shown</p>
       </div>
+
+      <section className="overview-stats" aria-label="Submission stats" data-testid="submission-stats">
+        <div>
+          <span>Attempts shown</span>
+          <strong>{stats.attempts}</strong>
+        </div>
+        <div>
+          <span>All tests passed</span>
+          <strong>{stats.passed}</strong>
+        </div>
+        <div>
+          <span>Tests need review</span>
+          <strong>{stats.needReview}</strong>
+        </div>
+        <div>
+          <span>Compile needs attention</span>
+          <strong>{stats.compileIssues}</strong>
+        </div>
+        <div>
+          <span>Median time on task</span>
+          <strong>{stats.medianMinutes} min</strong>
+        </div>
+        <div>
+          <span>Assistance withheld</span>
+          <strong>{stats.withheldHints}</strong>
+        </div>
+      </section>
 
       <div className="filter-bar" data-testid="submission-filters">
         <label>
@@ -199,7 +230,7 @@ export function Submissions() {
                   <span>{row.submission.testsPassed} / {row.submission.testsPassed + row.submission.testsFailed}</span>
                   <span>{row.submission.timeOnTaskMin} min</span>
                   <span className={row.submission.status === 'passed' ? 'is-pass' : 'is-review'}>
-                    {STATUS_LABEL[row.submission.status]}
+                    {STATUS_LABEL[row.submission.status]}{row.live ? ' · this session' : ''}
                   </span>
                 </button>
                 {openId === row.submission.id && <ExpandedRow row={row} />}
@@ -211,7 +242,9 @@ export function Submissions() {
         <p className="sentence-empty">No attempt matches these filters. Widen the time-on-task range or clear the outcome filter.</p>
       )}
       <p className="table-note">
-        Mean time on task in this selection: {Math.round(filtered.reduce((sum, row) => sum + row.submission.timeOnTaskMin, 0) / Math.max(filtered.length, 1))} minutes.
+        Mean time on task in this selection: {stats.meanMinutes} minutes.
+        {stats.fastestPass && ` Fastest pass: ${stats.fastestPass.student.displayName} at ${stats.fastestPass.submission.timeOnTaskMin} minutes.`}
+        {' '}Rows marked <em>this session</em> were submitted from the student view in this browser; every other row is seeded.
       </p>
     </section>
   )

@@ -7,7 +7,7 @@ import { dayMonthTime } from './format'
 import { overviewStats } from './selectors'
 
 export function Settings() {
-  const { labs, manuals, policies, resetCourse } = useCourse()
+  const { labs, manuals, policies, sessionSubmissions, sessionHints, resetCourse } = useCourse()
   const [projector, setProjector] = useState(projectorOn)
   const [resetAt, setResetAt] = useState<string | null>(null)
   const stats = overviewStats()
@@ -71,6 +71,8 @@ export function Settings() {
             <li><span>labs added in this session</span><strong>{localLabs}</strong></li>
             <li><span>manuals uploaded in this session</span><strong>{localManuals}</strong></li>
             <li><span>labs with an edited policy</span><strong>{changedPolicies}</strong></li>
+            <li><span>attempts submitted from the student view</span><strong>{sessionSubmissions.length}</strong></li>
+            <li><span>assistance requests made in the student view</span><strong>{sessionHints.length}</strong></li>
           </ul>
           <button
             className="primary-action"

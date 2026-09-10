@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { mockData } from '../mock/data'
 import { dayMonthTime, percent } from './format'
 import { hintEvents, labShort, studentName } from './selectors'
+import { useCourse } from '../state/useCourse'
 import type { HintAuditEvent } from '../types'
 
 function Expanded({ event }: { event: HintAuditEvent }) {
@@ -36,7 +37,8 @@ function Expanded({ event }: { event: HintAuditEvent }) {
 }
 
 export function HintAudit() {
-  const events = useMemo(() => hintEvents(), [])
+  const { sessionHints } = useCourse()
+  const events = useMemo(() => hintEvents(sessionHints), [sessionHints])
   const [labId, setLabId] = useState('all')
   const [blockedOnly, setBlockedOnly] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
@@ -77,7 +79,9 @@ export function HintAudit() {
           <span>Withheld only</span>
         </label>
         <p className="filter-note">
-          The guardrail compares the drafted reply with the reference solution. The model never sees that solution.
+          The guardrail compares the drafted reply with the reference solution. The model never sees
+          that solution. Rows marked <em>this session</em> are requests made from the student view in
+          this browser; every other row is seeded.
         </p>
       </div>
 
@@ -105,7 +109,9 @@ export function HintAudit() {
                   <span>{dayMonthTime(event.timestamp)}</span>
                   <span>Level {event.level}</span>
                   <span>{event.similarity.toFixed(2)} / {event.threshold.toFixed(2)}</span>
-                  <span className={event.blocked ? 'is-blocked' : 'is-pass'}>{event.blocked ? `withheld / ${event.reason}` : 'shown'}</span>
+                  <span className={event.blocked ? 'is-blocked' : 'is-pass'}>
+                    {event.blocked ? `withheld / ${event.reason}` : 'shown'}{event.id.startsWith('session-') ? ' · this session' : ''}
+                  </span>
                 </button>
                 {openId === event.id && <Expanded event={event} />}
               </div>
