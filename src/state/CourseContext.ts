@@ -1,5 +1,5 @@
 import { createContext } from 'react'
-import type { Lab, LabPolicy, ManualMeta } from '../types'
+import type { HintAuditEvent, Lab, LabPolicy, ManualMeta, Submission } from '../types'
 
 export type NewLabInput = {
   title: string
@@ -14,10 +14,23 @@ export type NewManualInput = {
   file: File
 }
 
+export type NewSubmissionInput = {
+  studentId: string
+  labId: string
+  code: string
+  compileOk: boolean
+  testsPassed: number
+  testsFailed: number
+  timeOnTaskMin: number
+}
+
 export type CourseContextValue = {
   labs: Lab[]
   manuals: ManualMeta[]
+  manualFiles: Record<string, File>
   policies: LabPolicy[]
+  sessionSubmissions: Submission[]
+  sessionHints: HintAuditEvent[]
   currentLab: Lab | null
   currentPolicy: LabPolicy | null
   createLab: (lab: NewLabInput) => Lab
@@ -25,6 +38,10 @@ export type CourseContextValue = {
   removeManual: (manualId: string) => void
   updatePolicy: (labId: string, patch: Partial<Omit<LabPolicy, 'labId'>>) => void
   setCurrentLab: (labId: string) => void
+  setLabStatus: (labId: string, status: Lab['status']) => void
+  deleteLab: (labId: string) => void
+  submitAttempt: (input: NewSubmissionInput) => Submission
+  logHint: (event: Omit<HintAuditEvent, 'id' | 'timestamp'>) => void
   resetCourse: () => void
 }
 

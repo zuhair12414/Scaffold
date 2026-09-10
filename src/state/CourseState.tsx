@@ -1,14 +1,22 @@
 import { useEffect, useMemo, useReducer, type ReactNode } from 'react'
-import { CourseContext, type CourseContextValue } from './CourseContext'
+import { CourseContext, type CourseContextValue, type NewSubmissionInput } from './CourseContext'
 import { mockData } from '../mock/data'
 import { clearDemoStorage } from './demo'
-import type { Lab, LabPolicy, ManualMeta } from '../types'
+import type { HintAuditEvent, Lab, LabPolicy, ManualMeta, Submission, SubmissionStatus } from '../types'
 
 type SavedCourseState = {
   labs: Lab[]
   manuals: ManualMeta[]
   policies: LabPolicy[]
   currentLabId: string
+  // Attempts the student submitted in this browser. They are the only rows in the
+  // console that were not generated from the seed, and they are labelled as such.
+  submissions: Submission[]
+  // Assistance requests made from the student view in this browser, so the
+  // instructor's Hint Audit shows the decision the student actually saw.
+  hints: HintAuditEvent[]
+  statusOverrides: Record<string, Lab['status']>
+  hiddenLabIds: string[]
 }
 
 type CourseState = SavedCourseState & {
@@ -21,6 +29,10 @@ type Action =
   | { type: 'remove_manual'; manualId: string }
   | { type: 'update_policy'; labId: string; patch: Partial<Omit<LabPolicy, 'labId'>> }
   | { type: 'set_current_lab'; labId: string }
+  | { type: 'set_lab_status'; labId: string; status: Lab['status'] }
+  | { type: 'delete_lab'; labId: string }
+  | { type: 'submit_attempt'; submission: Submission }
+  | { type: 'log_hint'; event: HintAuditEvent }
   | { type: 'reset' }
 
 const STORAGE_KEY = 'scaffold:course-state'
@@ -38,6 +50,10 @@ function savedSeed(): SavedCourseState {
     manuals: [],
     policies: seedPolicies,
     currentLabId: '',
+    submissions: [],
+    hints: [],
+    statusOverrides: {},
+    hiddenLabIds: [],
   }
 }
 
@@ -51,6 +67,10 @@ function loadSavedState(): SavedCourseState {
       manuals: parsed.manuals ?? [],
       policies: parsed.policies ?? seedPolicies,
       currentLabId: parsed.currentLabId ?? savedSeed().currentLabId,
+      submissions: parsed.submissions ?? [],
+      hints: parsed.hints ?? [],
+      statusOverrides: parsed.statusOverrides ?? {},
+      hiddenLabIds: parsed.hiddenLabIds ?? [],
     }
   } catch {
     return savedSeed()
@@ -101,6 +121,29 @@ function reducer(state: CourseState, action: Action): CourseState {
   if (action.type === 'set_current_lab') {
     return { ...state, currentLabId: action.labId }
   }
+  if (action.type === 'set_lab_status') {
+    return {
+      ...state,
+      labs: state.labs.map((lab) => (lab.id === action.labId ? { ...lab, status: action.status } : lab)),
+      statusOverrides: { ...state.statusOverrides, [action.labId]: action.status },
+    }
+  }
+  if (action.type === 'delete_lab') {
+    return {
+      ...state,
+      labs: state.labs.filter((lab) => lab.id !== action.labId),
+      hiddenLabIds: state.labs.some((lab) => lab.id === action.labId)
+        ? state.hiddenLabIds
+        : [...state.hiddenLabIds, action.labId],
+      currentLabId: state.currentLabId === action.labId ? '' : state.currentLabId,
+    }
+  }
+  if (action.type === 'submit_attempt') {
+    return { ...state, submissions: [...state.submissions, action.submission] }
+  }
+  if (action.type === 'log_hint') {
+    return { ...state, hints: [...state.hints, action.event] }
+  }
   if (action.type === 'reset') {
     return { ...savedSeed(), manualFiles: {} }
   }
@@ -113,12 +156,24 @@ function savedPart(state: CourseState): SavedCourseState {
     manuals: state.manuals,
     policies: state.policies,
     currentLabId: state.currentLabId,
+    submissions: state.submissions,
+    hints: state.hints,
+    statusOverrides: state.statusOverrides,
+    hiddenLabIds: state.hiddenLabIds,
   }
 }
 
 export function CourseProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, () => ({ ...loadSavedState(), manualFiles: {} }))
-  const labs = useMemo(() => [...mockData.labs, ...state.labs], [state.labs])
+  // Defaults are applied defensively: a browser can hold a saved state written by
+  // an earlier version of this file, and a missing field must not break a render.
+  const labs = useMemo(() => {
+    const hidden = state.hiddenLabIds ?? []
+    const overrides = state.statusOverrides ?? {}
+    return [...mockData.labs, ...(state.labs ?? [])]
+      .filter((lab) => !hidden.includes(lab.id))
+      .map((lab) => (overrides[lab.id] ? { ...lab, status: overrides[lab.id] } : lab))
+  }, [state.labs, state.hiddenLabIds, state.statusOverrides])
   const manuals = useMemo(() => [...mockData.manuals, ...state.manuals], [state.manuals])
   const policies = state.policies
   const currentLab = labs.find((lab) => lab.id === state.currentLabId) ?? null
@@ -135,7 +190,10 @@ export function CourseProvider({ children }: { children: ReactNode }) {
   const value = useMemo<CourseContextValue>(() => ({
     labs,
     manuals,
+    manualFiles: state.manualFiles ?? {},
     policies,
+    sessionSubmissions: state.submissions ?? [],
+    sessionHints: state.hints ?? [],
     currentLab,
     currentPolicy,
     createLab: (lab) => {
@@ -168,11 +226,36 @@ export function CourseProvider({ children }: { children: ReactNode }) {
     removeManual: (manualId) => dispatch({ type: 'remove_manual', manualId }),
     updatePolicy: (labId, patch) => dispatch({ type: 'update_policy', labId, patch }),
     setCurrentLab: (labId) => dispatch({ type: 'set_current_lab', labId }),
+    setLabStatus: (labId, status) => dispatch({ type: 'set_lab_status', labId, status }),
+    deleteLab: (labId) => dispatch({ type: 'delete_lab', labId }),
+    submitAttempt: (input: NewSubmissionInput) => {
+      const status: SubmissionStatus = !input.compileOk
+        ? 'compile_issue'
+        : input.testsFailed === 0 ? 'passed' : 'tests_failing'
+      const submission: Submission = {
+        id: `session-${Date.now()}`,
+        studentId: input.studentId,
+        labId: input.labId,
+        timestamp: new Date().toISOString(),
+        code: input.code,
+        compileOk: input.compileOk,
+        testsPassed: input.testsPassed,
+        testsFailed: input.testsFailed,
+        timeOnTaskMin: input.timeOnTaskMin,
+        status,
+      }
+      dispatch({ type: 'submit_attempt', submission })
+      return submission
+    },
+    logHint: (event) => dispatch({
+      type: 'log_hint',
+      event: { ...event, id: `session-hint-${Date.now()}`, timestamp: new Date().toISOString() },
+    }),
     resetCourse: () => {
       clearDemoStorage()
       dispatch({ type: 'reset' })
     },
-  }), [currentLab, currentPolicy, labs, manuals, policies])
+  }), [currentLab, currentPolicy, labs, manuals, policies, state.manualFiles, state.submissions, state.hints])
 
   return <CourseContext.Provider value={value}>{children}</CourseContext.Provider>
 }

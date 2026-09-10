@@ -72,7 +72,7 @@ export type TestResult = {
 
 export type TelemetryEvent = {
   t: string
-  kind: 'edit' | 'run' | 'paste' | 'idle' | 'hint' | 'escalate' | 'snooze'
+  kind: 'edit' | 'run' | 'paste' | 'idle' | 'hint' | 'escalate' | 'snooze' | 'submit'
   payload: Record<string, unknown>
 }
 
@@ -120,6 +120,10 @@ export type ManualMeta = {
   sizeBytes: number
   type: 'pdf' | 'md' | 'docx'
   uploadedAt: string
+  // Seeded manuals carry their text so the viewer has something to show. Files
+  // uploaded in the console are held in memory as File objects instead and are
+  // never parsed — see docs/TASKS.md, F3.
+  content?: string
 }
 
 export type StudentStatus = 'active' | 'struggling' | 'reviewing' | 'offline'
