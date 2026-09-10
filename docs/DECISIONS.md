@@ -146,3 +146,33 @@ between 0.49 and 0.55, values run 0.06 to 0.92, and 3 to 8 students sit below 0.
 on each concept. The six divergent students separate by 0.23 to 0.47 between the
 correctness-only and adjusted estimates. Still one fixed seed, still identical on
 every reload.
+
+### D18 · Every lab is a real problem, not one problem wearing six titles
+**Why:** the student view synthesised a Problem from a lab's title, statement and
+starter code, then borrowed the built-in factorial problem's hint ladder, tests,
+compiler diagnostic and reference solution. Opening Lab 5 gave BST starter code,
+factorial examples, factorial tests and a tutor that talked about recursion base
+cases. The product looked complete and was not.
+**Consequence:** `src/mock/labContent.ts` holds, per lab, its examples,
+constraints, five-level hint ladder, reference solution, mock test set and the two
+signals the mock compiler judges (the definition that must exist, and the one
+construct that makes the tests pass). `registerLabProblem` puts every lab into the
+same lookup a built-in problem uses, so providers and the guardrail need no special
+case. Measured across all six labs, Level 3 scores 0.37–0.56 and Level 4 scores
+0.66–0.95, so the default 0.60 threshold releases three levels and withholds the
+fourth in every lab. A lab authored in the console still borrows the built-in
+ladder — authoring a ladder is out of scope — and says so.
+
+### D19 · The student half of the loop is a loop, not a screenshot
+**Why:** the instructor console read submissions, manuals and hint decisions that
+the student view had no way to produce. A manual could be uploaded and never
+opened, a submission existed only in the seed, and a hint the guardrail withheld
+in the IDE never reached the audit.
+**Consequence:** the student view now carries its own lab list (the instructor's
+push wins when there is one), opens attached manuals in a viewer, submits attempts,
+and shows its own attempt history with the outcome of each. Submitted attempts and
+every assistance request — with the level, the measured similarity and the
+decision — flow into Submissions, Student detail and Hint Audit, labelled *this
+session* so they are never mistaken for seeded rows. `Reset demo` and `?demo=1`
+clear them. The instructor side gained the matching controls: view a manual, change
+a lab's status, remove a lab, and per-lab and per-selection submission statistics.

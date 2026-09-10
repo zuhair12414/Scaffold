@@ -55,12 +55,36 @@ mode on, no console errors on any screen:
   `similarity 0.85 > 0.60`; Level 5 is marked instructor-only.
 - `?demo=1` drops a planted leftover lab and returns the seeded state.
 
+## Flow completion pass — both roles end to end
+
+Every affordance now leads somewhere. What was dead before and works now:
+
+| Was | Is |
+|---|---|
+| Manual link went to `#manual-id` | Opens a viewer: seeded reference text, or the bytes of a file uploaded this session; the instructor gets the same viewer from the manual card |
+| Student had one lab, chosen by the instructor | Student has their own lab list; a lab the instructor pushes still wins |
+| Every lab used the factorial ladder, tests and diagnostic | Each of the six labs has its own examples, constraints, five-level ladder, reference solution, tests and compiler signal (D18) |
+| No way to submit | Submit in the header; attempts appear in the student's own history and in the console, marked *this session* |
+| Hints withheld in the IDE never reached the audit | Every assistance request is written to Hint Audit with its level, measured similarity and decision |
+| Submissions screen had no summary | Stat strip on Submissions, per-lab statistics on Labs & Manuals, an attempt summary on Student detail |
+| Labs could only be created | Status can be changed and a lab removed, both reversible by Reset demo |
+| Test results hidden in the default view | The product tutor shows tests and the plain-English diagnostic; the bare output stays with the baseline condition |
+
+Checked: Lab 1 run shows its own bounds warning and its own six tests; Lab 5 run
+shows `no node is ever unlinked or freed`; the Lab 5 tutor opens on the BST
+question, not the factorial one; submitting the starter code files a 0/6 attempt
+that appears in Submissions as *this session*; a hint request appears in Hint
+Audit at similarity 0.00 against the 0.60 threshold; setting Lab 5 to draft removes
+it from the student's lab list; `?demo=1` restores everything.
+
 ## Known limits — say these out loud rather than hide them
 
 - A lab authored in the console borrows the built-in problem's hint ladder, tests
-  and reference solution. Authoring a *new* ladder is out of scope for the PoC.
+  and reference solution. The six seeded labs each have their own (D18).
 - The compiler, the tests and the knowledge tracing are mocked. The guardrail is
   not: it measures real token overlap against the reference solution (D15).
+- Overview, Roster and Concepts read the seeded dataset only; attempts submitted in
+  this session appear on Submissions, Student detail and Hint Audit.
 - Session timelines are evenly spaced markers, not real timestamps on a scale.
 - Numbers on every screen are seeded demo data. The measured numbers live in
   `docs/EVIDENCE.md` and come from `spike/`.
