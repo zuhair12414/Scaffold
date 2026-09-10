@@ -3,8 +3,10 @@
 Knowledge-state-driven adaptive scaffolding for programming labs. React 19,
 TypeScript, Vite, Monaco. Two roles behind one shell:
 
-- **Student IDE** — editor, mocked compiler, concept estimates with uncertainty
-  bands, and a tutor that releases help one disclosure level at a time.
+- **Student IDE** — their own lab list, the lab statement and its attached manual,
+  editor and mocked compiler, concept estimates with uncertainty bands, a tutor
+  that releases help one disclosure level at a time, and Submit. Attempts and
+  assistance requests made here show up in the console, marked *this session*.
 - **Instructor console** — overview, roster, labs and manuals, submissions,
   concepts, hint audit, settings.
 

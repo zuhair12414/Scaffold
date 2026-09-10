@@ -74,9 +74,11 @@ src/                    React 19 + TS + Vite + Monaco. Two roles behind one shel
     selectors.ts        every derived number the screens display
     format.ts           display formatting only; the dataset keeps full precision
   components/           Header, ProblemPane, CodeEditor, OutputPanel, TutorPanel,
-                        StatusBar, MasteryBars (shared by both roles)
+                        StatusBar, MasteryBars, ManualViewer, Markdown
+                        (the last three are shared by both roles)
   state/                CourseState (labs, manuals, policy) · demo (rails, projector)
   mock/data.ts          the seeded dataset: 47 students, 8 KCs, 6 labs
+  mock/labContent.ts    per-lab examples, ladder, solution, tests, compiler signals
   providers/
     HintProvider.ts             interface all hint sources implement
     MockHintProvider.ts         canned ladder, no model, guardrail applied
