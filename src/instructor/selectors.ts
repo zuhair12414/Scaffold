@@ -152,25 +152,65 @@ export type SubmissionRow = {
   student: Student
   lab: Lab
   hints: HintAuditEvent[]
+  live: boolean
 }
 
 let cachedSubmissionRows: SubmissionRow[] | null = null
 
-export function submissionRows(): SubmissionRow[] {
-  if (cachedSubmissionRows) return cachedSubmissionRows
-  cachedSubmissionRows = mockData.submissions.map((submission) => ({
+function toRow(submission: Submission, live: boolean): SubmissionRow {
+  return {
     submission,
     student: studentById(submission.studentId) as Student,
     lab: labById(submission.labId) as Lab,
     hints: mockData.hintAudit.filter((event) => (
       event.studentId === submission.studentId && event.labId === submission.labId
     )),
-  }))
-  return cachedSubmissionRows
+    live,
+  }
 }
 
-export function hintEvents() {
-  return [...mockData.hintAudit].sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+// `live` rows are attempts submitted from the student view in this browser. They
+// are the only rows that did not come from the seed, and every screen labels them.
+export function submissionRows(live: Submission[] = []): SubmissionRow[] {
+  if (!cachedSubmissionRows) cachedSubmissionRows = mockData.submissions.map((row) => toRow(row, false))
+  if (!live.length) return cachedSubmissionRows
+  return [...cachedSubmissionRows, ...live.filter((row) => labById(row.labId) && studentById(row.studentId)).map((row) => toRow(row, true))]
+}
+
+export type SubmissionStats = {
+  attempts: number
+  passed: number
+  needReview: number
+  compileIssues: number
+  meanMinutes: number
+  medianMinutes: number
+  fastestPass: SubmissionRow | null
+  withheldHints: number
+}
+
+export function submissionStats(rows: SubmissionRow[]): SubmissionStats {
+  const minutes = rows.map((row) => row.submission.timeOnTaskMin).sort((a, b) => a - b)
+  const passes = rows.filter((row) => row.submission.status === 'passed')
+  return {
+    attempts: rows.length,
+    passed: passes.length,
+    needReview: rows.filter((row) => row.submission.status === 'tests_failing').length,
+    compileIssues: rows.filter((row) => row.submission.status === 'compile_issue').length,
+    meanMinutes: Math.round(mean(minutes)),
+    medianMinutes: minutes.length ? minutes[Math.floor(minutes.length / 2)] : 0,
+    fastestPass: passes.reduce<SubmissionRow | null>((best, row) => (
+      !best || row.submission.timeOnTaskMin < best.submission.timeOnTaskMin ? row : best
+    ), null),
+    withheldHints: rows.reduce((sum, row) => sum + row.hints.filter((hint) => hint.blocked).length, 0),
+  }
+}
+
+export function labStats(labId: string, live: Submission[] = []) {
+  return submissionStats(submissionRows(live).filter((row) => row.submission.labId === labId))
+}
+
+export function hintEvents(live: HintAuditEvent[] = []) {
+  return [...mockData.hintAudit, ...live].sort((a, b) => b.timestamp.localeCompare(a.timestamp))
 }
 
 export function overviewStats() {

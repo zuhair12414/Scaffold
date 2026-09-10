@@ -1,6 +1,8 @@
 import { useMemo, useState, type DragEvent, type FormEvent } from 'react'
+import { ManualViewer } from '../components/ManualViewer'
 import { mockData } from '../mock/data'
 import { count, dayMonth, dayMonthTime, fileSize } from './format'
+import { labStats } from './selectors'
 import { useCourse } from '../state/useCourse'
 import type { KnowledgeComponentId, Lab, ManualMeta } from '../types'
 
@@ -37,8 +39,7 @@ function MarkdownPreview({ text }: { text: string }) {
   )
 }
 
-function LabRow({ lab, manuals, selected, onSelect }: { lab: Lab; manuals: ManualMeta[]; selected: boolean; onSelect: () => void }) {
-  const submissions = mockData.submissions.filter((submission) => submission.labId === lab.id).length
+function LabRow({ lab, manuals, submissions, selected, onSelect }: { lab: Lab; manuals: ManualMeta[]; submissions: number; selected: boolean; onSelect: () => void }) {
   const attachedManuals = manuals.filter((manual) => manual.labId === lab.id)
 
   return (
@@ -51,7 +52,11 @@ function LabRow({ lab, manuals, selected, onSelect }: { lab: Lab; manuals: Manua
 }
 
 export function LabsManuals() {
-  const { labs, manuals, currentLab, currentPolicy, createLab, addManual, removeManual, updatePolicy, setCurrentLab } = useCourse()
+  const {
+    labs, manuals, manualFiles, currentLab, currentPolicy, sessionSubmissions,
+    createLab, addManual, removeManual, updatePolicy, setCurrentLab, setLabStatus, deleteLab,
+  } = useCourse()
+  const [openManual, setOpenManual] = useState<ManualMeta | null>(null)
   const [selectedLabId, setSelectedLabId] = useState(currentLab?.id ?? labs[0].id)
   const selectedLab = labs.find((lab) => lab.id === selectedLabId) ?? labs[0]
   const selectedPolicy = currentPolicy?.labId === selectedLab.id
@@ -65,9 +70,13 @@ export function LabsManuals() {
   const [kcIds, setKcIds] = useState<KnowledgeComponentId[]>(['bst-invariants'])
   const [pendingUpload, setPendingUpload] = useState<PendingUpload | null>(null)
   const canCreate = title.trim() && statement.trim() && starterCode.trim() && kcIds.length
-  const currentLabLabel = currentLab ? `Lab ${currentLab.number}: ${currentLab.title}` : 'Original IDE lab'
+  const currentLabLabel = currentLab
+    ? `Student view is on Lab ${currentLab.number}: ${currentLab.title}`
+    : 'Students pick from their own lab list'
 
   const labOptions = useMemo(() => [...labs].sort((a, b) => b.number - a.number), [labs])
+  const stats = useMemo(() => labStats(selectedLab.id, sessionSubmissions), [selectedLab.id, sessionSubmissions])
+  const isSeeded = mockData.labs.some((lab) => lab.id === selectedLab.id)
 
   const toggleKc = (id: KnowledgeComponentId) => {
     setKcIds((current) => (
@@ -114,7 +123,7 @@ export function LabsManuals() {
           <p className="instructor-eyebrow">Course material</p>
           <h1>Labs & Manuals</h1>
         </div>
-        <p>Student view is using {currentLabLabel}</p>
+        <p>{currentLabLabel}</p>
       </div>
 
       <div className="labs-grid">
@@ -131,6 +140,10 @@ export function LabsManuals() {
                 key={lab.id}
                 lab={lab}
                 manuals={manuals}
+                submissions={
+                  mockData.submissions.filter((row) => row.labId === lab.id).length
+                  + sessionSubmissions.filter((row) => row.labId === lab.id).length
+                }
                 selected={lab.id === selectedLab.id}
                 onSelect={() => setSelectedLabId(lab.id)}
               />
@@ -181,6 +194,53 @@ export function LabsManuals() {
           </button>
         </form>
 
+        <section className="detail-region stats-region" data-testid="lab-stats">
+          <div className="region-title">
+            <div>
+              <p className="instructor-eyebrow">This lab</p>
+              <h2>Submissions and assistance</h2>
+            </div>
+          </div>
+          <ul className="fact-list">
+            <li><span>attempts</span><strong>{stats.attempts}</strong></li>
+            <li><span>all tests passed</span><strong>{stats.passed}</strong></li>
+            <li><span>tests need review</span><strong>{stats.needReview}</strong></li>
+            <li><span>compile needs attention</span><strong>{stats.compileIssues}</strong></li>
+            <li><span>median time on task</span><strong>{stats.medianMinutes} min</strong></li>
+            <li><span>assistance withheld</span><strong>{stats.withheldHints}</strong></li>
+            {stats.fastestPass && (
+              <li>
+                <span>fastest pass</span>
+                <strong>{stats.fastestPass.student.displayName} / {stats.fastestPass.submission.timeOnTaskMin} min</strong>
+              </li>
+            )}
+          </ul>
+          <label className="status-row">
+            <span className="form-label">Status</span>
+            <select
+              className="sel"
+              value={selectedLab.status}
+              onChange={(event) => setLabStatus(selectedLab.id, event.target.value as Lab['status'])}
+              data-testid="lab-status"
+            >
+              <option value="draft">draft — students cannot see it</option>
+              <option value="open">open — students can work on it</option>
+              <option value="closed">closed — visible, no longer collected</option>
+            </select>
+          </label>
+          <button
+            className="secondary-action danger"
+            data-testid="remove-lab"
+            onClick={() => deleteLab(selectedLab.id)}
+          >
+            {isSeeded ? 'Hide from the demo' : 'Delete this lab'}
+          </button>
+          <p className="quiet-block">
+            Removing is reversible: Settings → Reset demo, or a reload with ?demo=1, brings the
+            seeded labs back.
+          </p>
+        </section>
+
         <section className="detail-region upload-region">
           <div className="region-title">
             <div>
@@ -209,7 +269,10 @@ export function LabsManuals() {
               <div key={manual.id} className="manual-card">
                 <span>{manual.name}</span>
                 <small>{manual.type} / {fileSize(manual.sizeBytes)} / {dayMonthTime(manual.uploadedAt)}</small>
-                <button onClick={() => removeManual(manual.id)}>Remove</button>
+                <div className="manual-actions">
+                  <button className="linkbtn" onClick={() => setOpenManual(manual)} data-testid="view-manual">View</button>
+                  <button className="linkbtn" onClick={() => removeManual(manual.id)}>Remove</button>
+                </div>
               </div>
             )) : <p className="sentence-empty">Attach a reference manual for this lab.</p>}
           </div>
@@ -254,6 +317,13 @@ export function LabsManuals() {
           </label>
         </section>
       </div>
+      {openManual && (
+        <ManualViewer
+          manual={openManual}
+          file={manualFiles[openManual.id]}
+          onClose={() => setOpenManual(null)}
+        />
+      )}
     </section>
   )
 }

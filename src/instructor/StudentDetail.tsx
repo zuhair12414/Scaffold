@@ -4,6 +4,8 @@ import { Link, useParams } from 'react-router-dom'
 import { MasteryBars } from '../components/MasteryBars'
 import { editorFont, editorTheme } from '../monaco-setup'
 import { mockData } from '../mock/data'
+import { useCourse } from '../state/useCourse'
+import { submissionStats, submissionRows } from './selectors'
 import { dayMonthTime, mastery } from './format'
 import type { KnowledgeComponent, KnowledgeComponentId, MasteryPoint, MasteryTrace, SessionEvent, Submission } from '../types'
 
@@ -179,7 +181,9 @@ function Timeline({ labs }: { labs: TimelineLab[] }) {
   )
 }
 
-function SubmissionViewer({ submissions, selected, onSelect }: { submissions: Submission[]; selected: Submission; onSelect: (submission: Submission) => void }) {
+function SubmissionViewer({ submissions, selected, onSelect, studentId }: { submissions: Submission[]; selected: Submission; onSelect: (submission: Submission) => void; studentId: string }) {
+  const stats = submissionStats(submissionRows(submissions.filter((row) => row.id.startsWith('session-')))
+    .filter((row) => row.student?.id === studentId))
   return (
     <section className="detail-region submissions-region" data-testid="submissions-region">
       <div className="region-title">
@@ -187,6 +191,10 @@ function SubmissionViewer({ submissions, selected, onSelect }: { submissions: Su
           <p className="instructor-eyebrow">Submissions</p>
           <h2>Code and test output</h2>
         </div>
+        <span>
+          {stats.attempts} attempts / {stats.passed} passed / median {stats.medianMinutes} min
+          {stats.withheldHints ? ` / ${stats.withheldHints} assistance requests withheld` : ''}
+        </span>
       </div>
       <div className="submission-workspace">
         <div className="submission-list">
@@ -199,7 +207,7 @@ function SubmissionViewer({ submissions, selected, onSelect }: { submissions: Su
                 onClick={() => onSelect(submission)}
               >
                 <span>{lab ? `Lab ${lab.number}: ${lab.title}` : submission.labId}</span>
-                <strong>{dayMonthTime(submission.timestamp)}</strong>
+                <strong>{dayMonthTime(submission.timestamp)}{submission.id.startsWith('session-') ? ' · this session' : ''}</strong>
                 <small>{submission.testsPassed} passed / {submission.testsFailed} need review / {submission.timeOnTaskMin} min</small>
               </button>
             )
@@ -240,6 +248,7 @@ function SubmissionViewer({ submissions, selected, onSelect }: { submissions: Su
 
 export function StudentDetail() {
   const { studentId } = useParams()
+  const { sessionSubmissions } = useCourse()
   const student = mockData.students.find((item) => item.id === studentId)
   const traces = useMemo(
     () => mockData.masteryTraces.filter((trace) => trace.studentId === student?.id),
@@ -247,8 +256,11 @@ export function StudentDetail() {
   )
   const [selectedKc, setSelectedKc] = useState<KnowledgeComponentId>('in-order-successor')
   const submissions = useMemo(
-    () => mockData.submissions.filter((submission) => submission.studentId === student?.id),
-    [student?.id],
+    () => [
+      ...mockData.submissions.filter((submission) => submission.studentId === student?.id),
+      ...sessionSubmissions.filter((submission) => submission.studentId === student?.id),
+    ].sort((a, b) => a.timestamp.localeCompare(b.timestamp)),
+    [student?.id, sessionSubmissions],
   )
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null)
   const selectedSubmission = submissions.find((submission) => submission.id === selectedSubmissionId) ?? submissions[submissions.length - 1]
@@ -306,7 +318,12 @@ export function StudentDetail() {
         <MasteryChart traces={traces} selectedKc={selectedTraceId} divergent={student.divergent} />
         <ConceptBars bars={conceptBars} />
         <Timeline labs={timelineLabs} />
-        <SubmissionViewer submissions={submissions} selected={selectedSubmission} onSelect={(submission) => setSelectedSubmissionId(submission.id)} />
+        <SubmissionViewer
+          submissions={submissions}
+          selected={selectedSubmission}
+          onSelect={(submission) => setSelectedSubmissionId(submission.id)}
+          studentId={student.id}
+        />
       </div>
     </section>
   )
