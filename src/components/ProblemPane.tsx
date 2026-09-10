@@ -1,6 +1,19 @@
+import { Markdown } from './Markdown'
 import { MasteryBars, type MasteryBarItem } from './MasteryBars'
 import type { Problem } from '../data/problems'
-import type { LabPolicy, ManualMeta } from '../types'
+import type { Lab, LabPolicy, ManualMeta, Submission } from '../types'
+
+function when(iso: string) {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return iso
+  return `${date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} ${date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
+}
+
+const OUTCOME: Record<Submission['status'], string> = {
+  passed: 'all tests passed',
+  tests_failing: 'tests need review',
+  compile_issue: 'did not compile',
+}
 
 export function ProblemPane({
   p,
@@ -10,6 +23,11 @@ export function ProblemPane({
   policy = null,
   mastery = [],
   recording = false,
+  labs = [],
+  selectedLabId = '',
+  onSelectLab,
+  attempts = [],
+  onOpenManual,
 }: {
   p: Problem
   collapsed: boolean
@@ -18,19 +36,47 @@ export function ProblemPane({
   policy?: LabPolicy | null
   mastery?: MasteryBarItem[]
   recording?: boolean
+  labs?: Lab[]
+  selectedLabId?: string
+  onSelectLab?: (labId: string) => void
+  attempts?: Submission[]
+  onOpenManual?: (manual: ManualMeta) => void
 }) {
+  const best = attempts.reduce((top, attempt) => Math.max(top, attempt.testsPassed), 0)
+  const minutes = attempts.reduce((sum, attempt) => sum + attempt.timeOnTaskMin, 0)
+
   return (
     <aside className={'pane problem' + (collapsed ? ' collapsed' : '')} aria-label="Problem">
-      <div className="rail">{p.id} · {p.title}</div>
+      <div className="rail">{p.lab} · {p.title}</div>
+      {onSelectLab && labs.length > 0 && (
+        <label className="lab-picker">
+          <span className="sec">Your labs</span>
+          <select
+            className="sel"
+            value={selectedLabId}
+            onChange={(event) => onSelectLab(event.target.value)}
+            data-testid="student-lab-picker"
+          >
+            <option value="">Practice: {p.id === 'P02' ? 'Factorial, recursively' : 'built-in problem'}</option>
+            {labs.map((lab) => (
+              <option key={lab.id} value={lab.id}>
+                Lab {lab.number}: {lab.title}{lab.status === 'closed' ? ' (closed)' : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <h1>{p.title}</h1>
-      <p>{p.statement}</p>
+      <Markdown text={p.statement} />
       {manuals.length > 0 && (
         <>
           <div className="sec">Reference material</div>
           <ul className="reference-list">
             {manuals.map((manual) => (
               <li key={manual.id}>
-                <a href={`#manual-${manual.id}`}>{manual.name}</a>
+                <button className="linkbtn" onClick={() => onOpenManual?.(manual)} data-testid="open-manual">
+                  {manual.name}
+                </button>
               </li>
             ))}
           </ul>
@@ -71,6 +117,23 @@ export function ProblemPane({
           </div>
         ))}
       </div>}
+      {attempts.length > 0 && (
+        <div className="attempts" data-testid="student-attempts">
+          <div className="sec">Your attempts</div>
+          <p className="attempt-summary">
+            {attempts.length} submitted · best {best} of {attempts[0].testsPassed + attempts[0].testsFailed} tests · {minutes} min on task
+          </p>
+          <ul className="attempt-list">
+            {[...attempts].reverse().map((attempt) => (
+              <li key={attempt.id} className={attempt.status === 'passed' ? 'is-pass' : 'is-review'}>
+                <span>{when(attempt.timestamp)}</span>
+                <strong>{attempt.testsPassed} / {attempt.testsPassed + attempt.testsFailed}</strong>
+                <small>{OUTCOME[attempt.status]} · {attempt.timeOnTaskMin} min{attempt.id.startsWith('session-') ? ' · this session' : ''}</small>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {recording && (
         <details className="telemetry-note" data-testid="telemetry-note">
           <summary>This session is being recorded for your progress estimate</summary>
