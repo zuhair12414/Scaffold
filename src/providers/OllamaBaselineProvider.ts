@@ -33,7 +33,7 @@ export class OllamaBaselineProvider implements HintProvider {
   }
 
   async requestHint(req: HintRequest, onDelta?: (text: string) => void): Promise<HintResponse> {
-    const p = problems[req.problemId]
+    const p = problems[req.problemId] ?? problems.P02
     const variant = req.promptVariant ?? 'plain'
     const base = req.systemPrompt ?? prompts[(variant in prompts ? variant : 'plain') as Preset]
     const blocks: string[] = []

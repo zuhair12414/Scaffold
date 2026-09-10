@@ -9,6 +9,9 @@ export type Problem = {
   constraints: string[]
   concepts: { name: string; mastery: number }[]
   starter: string
+  // Guardrail comparator only. Never sent to a model, never rendered — see
+  // src/providers/guardrail.ts and AGENTS.md §4.3.
+  solution: string
   hints: Record<0 | 1 | 2 | 3 | 4, HintSpec>
   tests: { name: string; input: number; expected: number; hidden: boolean }[]
 }
@@ -38,6 +41,10 @@ int main() {
     return 0;
 }
 `,
+    solution: `int fact(int n) {
+    if (n <= 1) return 1;
+    return n * fact(n - 1);
+}`,
     hints: {
       0: {
         text: 'Every call to fact makes another call to fact. What should happen when n is small enough that there is nothing left to multiply?',
