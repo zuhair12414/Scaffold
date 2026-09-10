@@ -1,0 +1,9 @@
+{
+  "notes": "Week 3 notes, Recursion. A recursive function solves a problem by calling itself on a smaller input. Every recursive function needs two parts: a base case, which is an input small enough to answer directly without another call, and a recursive case, which reduces the input and calls the function again. Without a base case the calls never stop and the program crashes with a stack overflow. For factorial the mathematical definition is 0! = 1 and n! = n * (n-1)! for n > 0.",
+  "history": "Student's last three attempts on this problem:\n1. 14:32 compiled with warning -Winfinite-recursion, tests 0/6, runtime stack overflow.\n2. 14:38 same code with a renamed parameter, same warning, tests 0/6.\n3. 14:41 added a comment, no logic change, same warning, tests 0/6.\nHints already given: none.",
+  "solution": "Reference solution (instructor only):\nint fact(int n) {\n    if (n <= 1) return 1;\n    return n * fact(n - 1);\n}",
+  "profiles": {
+    "strong": "Student profile from the course record: recursion mastered (0.91), functions mastered (0.95), completed all Week 2 and Week 3 exercises on first attempt, this is their first error this lab.",
+    "novice": "Student profile from the course record: recursion not yet demonstrated (0.18), functions developing (0.55), needed four attempts on the last two problems, has never written a base case correctly."
+  }
+}

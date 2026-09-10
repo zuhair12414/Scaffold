@@ -1,0 +1,110 @@
+[
+ {
+  "model": "llama3.2:3b",
+  "condition": "Baseline prompt",
+  "n": 18,
+  "leaked": 13,
+  "partial": 3,
+  "clean": 2,
+  "semantic": 11
+ },
+ {
+  "model": "llama3.2:3b",
+  "condition": "RAG",
+  "n": 18,
+  "leaked": 12,
+  "partial": 2,
+  "clean": 4,
+  "semantic": 11
+ },
+ {
+  "model": "llama3.2:3b",
+  "condition": "RAG + system prompt",
+  "n": 18,
+  "leaked": 3,
+  "partial": 0,
+  "clean": 15,
+  "semantic": 1
+ },
+ {
+  "model": "llama3.2:3b",
+  "condition": "RAG with solution",
+  "n": 18,
+  "leaked": 11,
+  "partial": 2,
+  "clean": 5,
+  "semantic": 13
+ },
+ {
+  "model": "llama3.2:3b",
+  "condition": "RAG with solution + system prompt",
+  "n": 18,
+  "leaked": 2,
+  "partial": 1,
+  "clean": 15,
+  "semantic": 1
+ },
+ {
+  "model": "llama3.2:3b",
+  "condition": "System prompt",
+  "n": 18,
+  "leaked": 2,
+  "partial": 1,
+  "clean": 15,
+  "semantic": 0
+ },
+ {
+  "model": "qwen2.5-coder:7b",
+  "condition": "Baseline prompt",
+  "n": 18,
+  "leaked": 11,
+  "partial": 0,
+  "clean": 7,
+  "semantic": 7
+ },
+ {
+  "model": "qwen2.5-coder:7b",
+  "condition": "RAG",
+  "n": 18,
+  "leaked": 7,
+  "partial": 1,
+  "clean": 10,
+  "semantic": 5
+ },
+ {
+  "model": "qwen2.5-coder:7b",
+  "condition": "RAG + system prompt",
+  "n": 18,
+  "leaked": 0,
+  "partial": 0,
+  "clean": 18,
+  "semantic": 0
+ },
+ {
+  "model": "qwen2.5-coder:7b",
+  "condition": "RAG with solution",
+  "n": 18,
+  "leaked": 7,
+  "partial": 2,
+  "clean": 9,
+  "semantic": 6
+ },
+ {
+  "model": "qwen2.5-coder:7b",
+  "condition": "RAG with solution + system prompt",
+  "n": 18,
+  "leaked": 0,
+  "partial": 0,
+  "clean": 18,
+  "semantic": 0
+ },
+ {
+  "model": "qwen2.5-coder:7b",
+  "condition": "System prompt",
+  "n": 18,
+  "leaked": 0,
+  "partial": 0,
+  "clean": 18,
+  "semantic": 1
+ }
+]
