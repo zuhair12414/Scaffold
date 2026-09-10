@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import Editor, { type OnMount } from '@monaco-editor/react'
-import { monaco } from '../monaco-setup'
+import { editorFont, editorTheme, monaco } from '../monaco-setup'
 
 type Ed = Parameters<OnMount>[0]
 export type EditorActions = {
@@ -56,14 +56,14 @@ export function CodeEditor({ value, onChange, onCursor, highlight, actions, lite
       <Editor
         height="100%"
         language="cpp"
-        theme={lite ? "vs-dark" : "scaffold-dark"}
+        theme={editorTheme}
         path="main.cpp"
         value={value}
         onChange={(v) => onChange(v ?? '')}
         onMount={onMount}
         loading={<div className="empty" style={{ padding: 16 }}>Loading editor</div>}
         options={{
-          fontFamily: lite ? 'Menlo, Consolas, monospace' : "'JetBrains Mono', ui-monospace, Menlo, monospace",
+          fontFamily: editorFont,
           fontSize: lite ? 13 : 13,
           lineHeight: lite ? 19 : 22,
           fontLigatures: !lite,
