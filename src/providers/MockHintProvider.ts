@@ -2,6 +2,7 @@ import type { HintProvider } from './HintProvider'
 import { applyGuardrail } from './guardrail'
 import type { Diagnostic, HintRequest, HintResponse, Level } from '../types'
 import { problems } from '../data/problems'
+import { labContent } from '../mock/labContent'
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -41,8 +42,26 @@ export class MockHintProvider implements HintProvider {
 
   async explainDiagnostic(d: Diagnostic): Promise<string> {
     await wait(300)
-    return explanations[d.cls] ?? 'The compiler reported a problem on this line.'
+    return explanationFor(d.cls)
   }
+}
+
+// One explanation per diagnostic class, collected from every lab and the built-in
+// problem, so a lab's compiler output is explained in that lab's terms.
+function explanationFor(cls: string) {
+  for (const content of Object.values(labContent)) {
+    if (content.checks.keyCls === cls) return content.checks.explanation
+    if (content.checks.definitionCls === cls) {
+      return 'The tests call a function that is not defined yet. Check the name and the signature against the starter code.'
+    }
+  }
+  for (const problem of Object.values(problems)) {
+    if (problem.checks.keyCls === cls) return problem.checks.explanation
+    if (problem.checks.definitionCls === cls) {
+      return 'The tests call a function that is not defined yet. Check the name and the signature against the starter code.'
+    }
+  }
+  return 'The compiler reported a problem on this line.'
 }
 
 function findLines(code: string, needle: RegExp): number[] | undefined {
@@ -51,9 +70,3 @@ function findLines(code: string, needle: RegExp): number[] | undefined {
   return out.length ? out : undefined
 }
 
-const explanations: Record<string, string> = {
-  'infinite-recursion':
-    'The compiler can prove that fact always calls fact again, so no call ever returns. A recursive function needs at least one path that returns a value without calling itself.',
-  'undefined-fact':
-    'The tests call a function named fact, but nothing with that name is defined. Check the function name and its spelling.',
-}

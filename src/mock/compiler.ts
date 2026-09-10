@@ -3,35 +3,36 @@ import type { Problem } from '../data/problems'
 
 export type RunResult = { diagnostics: Diagnostic[]; tests: TestResult[]; ok: boolean }
 
-// Deterministic stand-in for the sandboxed GCC run. Recognises the two states the
-// demo needs: base case missing, base case present.
+// Deterministic stand-in for the sandboxed GCC run. Each problem declares the two
+// signals it is judged on (src/mock/labContent.ts): the definition that has to
+// exist, and the one construct that makes the tests pass. Every lab gets its own
+// diagnostic instead of one problem's compiler output standing in for all of them.
 export function mockRun(code: string, p: Problem): RunResult {
   const lines = code.split('\n')
-  const defLine = lines.findIndex((l) => /int\s+fact\s*\(/.test(l))
-  const recLine = lines.findIndex((l) => /return\s+n\s*\*\s*fact\s*\(/.test(l))
-  const hasBase = /if\s*\(\s*n\s*(<=|==|<)\s*[01]\s*\)/.test(code) || /n\s*(<=|==|<)\s*[01]\s*\?/.test(code)
+  const checks = p.checks
+  const tests = (actual: string, passed: boolean) =>
+    p.tests.map((t) => ({ name: t.name, passed, expected: t.expected, actual: passed ? t.expected : actual, hidden: t.hidden }))
 
-  if (defLine < 0) {
+  if (!checks.definition.test(code)) {
     return {
       ok: false,
-      diagnostics: [{ line: 1, col: 1, severity: 'error', raw: "undefined reference to 'fact(int)'", cls: 'undefined-fact' }],
-      tests: p.tests.map((t) => ({ name: t.name, passed: false, expected: String(t.expected), actual: 'did not compile', hidden: t.hidden })),
+      diagnostics: [{ line: 1, col: 1, severity: 'error', raw: checks.definitionRaw, cls: checks.definitionCls }],
+      tests: tests('did not compile', false),
     }
   }
 
-  if (!hasBase) {
-    const l = (recLine >= 0 ? recLine : defLine) + 1
-    const col = (lines[l - 1].search(/\S/) ?? 0) + 1
+  if (!checks.key.test(code)) {
+    const anchor = checks.keyAnchor
+    const found = anchor ? lines.findIndex((line) => anchor.test(line)) : -1
+    const index = found >= 0 ? found : lines.findIndex((line) => checks.definition.test(line))
+    const line = Math.max(index, 0) + 1
+    const col = (lines[line - 1]?.search(/\S/) ?? 0) + 1
     return {
       ok: false,
-      diagnostics: [{ line: l, col, severity: 'warning', raw: 'infinite recursion detected [-Winfinite-recursion]', cls: 'infinite-recursion' }],
-      tests: p.tests.map((t) => ({ name: t.name, passed: false, expected: String(t.expected), actual: 'runtime error: stack overflow', hidden: t.hidden })),
+      diagnostics: [{ line, col, severity: checks.keySeverity, raw: checks.keyRaw, cls: checks.keyCls }],
+      tests: tests(checks.keySeverity === 'error' ? 'did not compile' : 'failed at runtime', false),
     }
   }
 
-  return {
-    ok: true,
-    diagnostics: [],
-    tests: p.tests.map((t) => ({ name: t.name, passed: true, expected: String(t.expected), actual: String(t.expected), hidden: t.hidden })),
-  }
+  return { ok: true, diagnostics: [], tests: tests('', true) }
 }
