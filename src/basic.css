@@ -13,6 +13,7 @@ html[data-ui="lite"] {
   --pass: #6cc070;
   --fail: #f26d6d;
   --warn: #e0b060;
+  --info: #b39ddb;
   --font-ui: Arial, Helvetica, sans-serif;
   --font-code: Menlo, Consolas, monospace;
   --dur: 0ms;
