@@ -80,7 +80,7 @@ export function TutorPanel({ mode, lite = false, promptVariant, onPromptVariant,
   const [models, setModels] = useState<string[]>([])
   useEffect(() => {
     if (!showSys) return
-    const hidden = String(import.meta.env.VITE_HIDE_MODELS ?? 'qwen2.5-coder:7b').split(',').map((x) => x.trim()).filter(Boolean)
+    const hidden = String(import.meta.env.VITE_HIDE_MODELS ?? '').split(',').map((x) => x.trim()).filter(Boolean)
     fetch('/ollama/api/tags').then((r) => r.json()).then((d: { models?: { name: string }[] }) => setModels((d.models ?? []).map((m) => m.name).filter((m) => !hidden.includes(m)))).catch(() => setModels([]))
   }, [showSys])
   const PRESET_LABEL: Record<string, string> = { plain: 'Plain assistant', basic: 'Tutoring prompt', hardened: 'Hardened prompt' }
