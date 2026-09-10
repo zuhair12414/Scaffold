@@ -28,6 +28,7 @@ export function ProblemPane({
   onSelectLab,
   attempts = [],
   onOpenManual,
+  closed = false,
 }: {
   p: Problem
   collapsed: boolean
@@ -41,6 +42,7 @@ export function ProblemPane({
   onSelectLab?: (labId: string) => void
   attempts?: Submission[]
   onOpenManual?: (manual: ManualMeta) => void
+  closed?: boolean
 }) {
   const best = attempts.reduce((top, attempt) => Math.max(top, attempt.testsPassed), 0)
   const minutes = attempts.reduce((sum, attempt) => sum + attempt.timeOnTaskMin, 0)
@@ -67,6 +69,12 @@ export function ProblemPane({
         </label>
       )}
       <h1>{p.title}</h1>
+      {closed && (
+        <p className="closed-note" data-testid="closed-note">
+          This lab is closed. You can still read it and ask for hints; new attempts are no longer
+          collected.
+        </p>
+      )}
       <Markdown text={p.statement} />
       {manuals.length > 0 && (
         <>
