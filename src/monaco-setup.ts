@@ -53,4 +53,11 @@ monaco.editor.defineTheme('scaffold-dark', {
   },
 })
 
+// One editor identity for every Monaco instance in the app — the student IDE and
+// the instructor's read-only submission viewer — so both shells read as one product.
+export const editorTheme = import.meta.env.VITE_UI === 'full' ? 'scaffold-dark' : 'vs-dark'
+export const editorFont = import.meta.env.VITE_UI === 'full'
+  ? "'JetBrains Mono', ui-monospace, Menlo, monospace"
+  : 'Menlo, Consolas, monospace'
+
 export { monaco }
