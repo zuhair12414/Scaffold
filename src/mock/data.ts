@@ -116,14 +116,64 @@ const labsBase: Omit<Lab, 'manualIds'>[] = [
   },
 ]
 
+const BST_REFERENCE = `# Deleting from a binary search tree
+
+Course reference, CS2 Data Structures. Attached to Lab 5 by the instructor.
+
+## The three shapes
+
+A node you are asked to remove is one of three shapes, and only the third is hard.
+
+- **A leaf.** Nothing depends on it. The parent link becomes null.
+- **One child.** The child takes the node's place. The ordering still holds,
+  because everything in that subtree was already on the correct side.
+- **Two children.** Neither child can take the place directly: whichever you
+  choose, the other subtree has nowhere to hang.
+
+## Why the successor
+
+For the two-child case you need a value that is larger than everything in the
+left subtree and smaller than everything in the right subtree. Exactly two values
+qualify: the largest value in the left subtree, and the smallest in the right.
+The smallest in the right subtree is the **in-order successor**, and it is found
+by taking one step right and then walking left until you cannot.
+
+That node has at most one child, by construction — nothing is smaller than it in
+that subtree — so removing it is one of the two easy cases.
+
+## The order of operations
+
+1. Find the node. If the key is smaller, descend left; if larger, descend right.
+2. If it has fewer than two children, hand back the child that survives.
+3. Otherwise copy the successor's value into the node.
+4. Delete the successor from the right subtree, not from the whole tree.
+
+Copying the value before removing the successor is what keeps the tree ordered
+at every step. Removing first leaves a hole with two orphaned subtrees.
+
+## What usually goes wrong
+
+- Returning the node instead of its replacement, so nothing is ever unlinked.
+- Freeing a node that is still reachable from its parent.
+- Searching for the successor in the whole tree instead of the right subtree.
+- Forgetting that erasing the root changes what the caller must hold.
+
+## Complexity
+
+Every step moves one level down, so the work is proportional to the height of the
+tree: O(h). For a balanced tree that is O(log n); for a tree built from sorted
+input it degrades to O(n).
+`
+
 const manuals: ManualMeta[] = [
   {
     id: 'manual-lab-05-bst',
     labId: 'lab-05',
-    name: 'bst-delete-reference.pdf',
-    sizeBytes: 384216,
-    type: 'pdf',
+    name: 'bst-delete-reference.md',
+    sizeBytes: BST_REFERENCE.length,
+    type: 'md',
     uploadedAt: '2026-10-09T11:30:00.000+05:00',
+    content: BST_REFERENCE,
   },
 ]
 
