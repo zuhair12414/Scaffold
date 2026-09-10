@@ -316,7 +316,7 @@ export default function StudentIde() {
         hintLabel={mode === 'baseline' ? 'Ask' : 'Hint'}
         onRun={doRun}
         onHint={() => setTutorOpen((o) => !o)}
-        onSubmit={activeLab ? submit : undefined}
+        onSubmit={activeLab && activeLab.status !== 'closed' ? submit : undefined}
         submitState={submitState}
       />
       <div className="main">
@@ -333,6 +333,7 @@ export default function StudentIde() {
           onSelectLab={selectLab}
           attempts={attempts}
           onOpenManual={setOpenManual}
+          closed={activeLab?.status === 'closed'}
         />
         <div className="center">
           <CodeEditor

@@ -69,6 +69,7 @@ Every affordance now leads somewhere. What was dead before and works now:
 | Submissions screen had no summary | Stat strip on Submissions, per-lab statistics on Labs & Manuals, an attempt summary on Student detail |
 | Labs could only be created | Status can be changed and a lab removed, both reversible by Reset demo |
 | Test results hidden in the default view | The product tutor shows tests and the plain-English diagnostic; the bare output stays with the baseline condition |
+| A closed lab still accepted work | A closed lab says so and stops collecting attempts; it can still be read and asked about |
 
 Checked: Lab 1 run shows its own bounds warning and its own six tests; Lab 5 run
 shows `no node is ever unlinked or freed`; the Lab 5 tutor opens on the BST
