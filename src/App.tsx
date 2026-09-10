@@ -94,7 +94,7 @@ export default function App() {
     let res: HintResponse
     try {
       res = await provider.requestHint(
-        { problemId: p.id, code, level, mastery, struggle, question, trigger, promptVariant, context, profile },
+        { problemId: p.id, code, level, mastery, struggle, question, trigger, promptVariant, systemPrompt, model, context, profile },
         (text) => setCards((cs) => cs.map((c) => (c.id === id ? { ...c, text } : c))),
       )
     } catch (e) {
