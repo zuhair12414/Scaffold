@@ -76,8 +76,8 @@ Command: `bash spike/run_all.sh` (needs Ollama running locally).
 `qwen2.5-coder:7b`, basic prompt: **11/18 leaked** a runnable solution.
 
 **Verdict on R1: confirmed, with a sharper result than expected.**
-- Hardening reduces leakage by roughly 6× **but never reaches zero** — 2–3 in 18
-  still emit a runnable solution under adversarial pressure.
+- Hardening moved runnable-solution leakage from 13/18 under the baseline prompt
+  to 2/18 under the hardened system prompt. It did not reach zero.
 - Putting the reference solution in context (`rag_solution`) makes leakage
   *worse*, not better. **Design consequence: the solution never enters the
   model's context; it lives only in the guardrail comparator.**
@@ -129,11 +129,11 @@ the proposal slide.
 
 | Priority | Gap | Effort | Why it matters |
 |---|---|---|---|
-| **P0** | `spike/README.md` answering the five C.12 questions | 1 h | Directly marked; currently missing |
-| **P0** | `--fast` mode + a single `spike/demo.sh` that is *the* live demo | 1 h | The gate is a live run, not a folder of results |
-| **P1** | R2 exhibit: mastery-inflation run (BKT under injected delegation) | 1 day | This is the research contribution; R1 alone is a safety result |
-| **P1** | Classifier validation: hand-label ~60 replies, report agreement with `classify()` | 3 h | Otherwise every number rests on unvalidated regex |
-| **P2** | Second problem beyond `fact()` | 3 h | One problem is a fair criticism |
+| **P0** | `spike/README.md` answering the five C.12 questions | done | Directly marked |
+| **P0** | `--fast` mode + a single `spike/demo.sh` that is *the* live demo | done | The gate is a live run, not a folder of results |
+| **P1** | R2 exhibit: mastery-inflation run (BKT under injected delegation) | done | This is the research contribution; R1 alone is a safety result |
+| **P1** | Classifier validation: hand-label replies, report agreement with `classify()` | script ready; labels not measured yet | Otherwise every number rests on unvalidated regex |
+| **P2** | Second problem beyond `fact()` | done | One problem is a fair criticism |
 | **P2** | Confidence intervals on leak rates (n=18 is small) | 1 h | Pre-empts "is 2 vs 13 significant?" |
 
 ---

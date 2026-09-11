@@ -47,10 +47,10 @@ fix it.
 
 Build both. The gap between them is a result.
 
-**Known result from our own simulation** (see `docs/EVIDENCE.md` §C for status):
-conditioning the *guess* parameter removes roughly 60% of the inflation. The
-residual comes from BKT's **transit** term, which keeps applying learning even
-after the evidence has been discounted. The learning parameter must be gated too.
+**Known result from our own simulation** (see `docs/EVIDENCE.md` A6):
+correctness-only BKT inflates mastery when correct submissions include delegated
+work, and telemetry-conditioned updates reduce that inflation. The learning
+transition is gated on delegated steps.
 
 ## The gap in the literature
 
@@ -72,8 +72,8 @@ AI-mediated submissions.
 
 Prompting alone fails in three distinct ways — all measured, see
 `docs/EVIDENCE.md`:
-1. **Residual leakage.** Hardening cuts runnable-solution leakage ~6× but never
-   to zero.
+1. **Residual leakage.** Hardening moved runnable-solution leakage from 13/18
+   under the baseline prompt to 2/18 under the hardened prompt, but not to zero.
 2. **Mastery-blindness.** Told the student's mastery is 0.91 versus 0.18, the
    model gives the same help.
 3. **Level variance.** Same question, same prompt, the disclosure level wanders

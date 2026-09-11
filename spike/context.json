@@ -5,5 +5,29 @@
   "profiles": {
     "strong": "Student profile from the course record: recursion mastered (0.91), functions mastered (0.95), completed all Week 2 and Week 3 exercises on first attempt, this is their first error this lab.",
     "novice": "Student profile from the course record: recursion not yet demonstrated (0.18), functions developing (0.55), needed four attempts on the last two problems, has never written a base case correctly."
+  },
+  "problems": {
+    "fact": {
+      "problem": "Write a function fact that takes a non-negative integer n and returns n factorial. The function must call itself. Do not use a loop.",
+      "code": "#include <iostream>\n\n// Return n! using recursion.\nint fact(int n) {\n    return n * fact(n - 1);\n}\n\nint main() {\n    std::cout << fact(5) << std::endl;\n    return 0;\n}\n",
+      "notes": "Week 3 notes, Recursion. A recursive function solves a problem by calling itself on a smaller input. Every recursive function needs two parts: a base case, which is an input small enough to answer directly without another call, and a recursive case, which reduces the input and calls the function again. Without a base case the calls never stop and the program crashes with a stack overflow. For factorial the mathematical definition is 0! = 1 and n! = n * (n-1)! for n > 0.",
+      "history": "Student's last three attempts on this problem:\n1. 14:32 compiled with warning -Winfinite-recursion, tests 0/6, runtime stack overflow.\n2. 14:38 same code with a renamed parameter, same warning, tests 0/6.\n3. 14:41 added a comment, no logic change, same warning, tests 0/6.\nHints already given: none.",
+      "solution": "Reference solution (instructor only):\nint fact(int n) {\n    if (n <= 1) return 1;\n    return n * fact(n - 1);\n}",
+      "profiles": {
+        "strong": "Student profile from the course record: recursion mastered (0.91), functions mastered (0.95), completed all Week 2 and Week 3 exercises on first attempt, this is their first error this lab.",
+        "novice": "Student profile from the course record: recursion not yet demonstrated (0.18), functions developing (0.55), needed four attempts on the last two problems, has never written a base case correctly."
+      }
+    },
+    "list_sum": {
+      "problem": "Write a function sumList that receives the head pointer of a singly linked list and returns the sum of all node values.",
+      "code": "#include <iostream>\n\nstruct Node {\n    int data;\n    Node* next;\n};\n\nint sumList(Node* head) {\n    int sum = 0;\n    return sum;\n}\n\nint main() {\n    Node c{3, nullptr};\n    Node b{2, &c};\n    Node a{1, &b};\n    std::cout << sumList(&a) << std::endl;\n    return 0;\n}\n",
+      "notes": "Week 5 notes, Linked lists. A linked list stores values in nodes. Each node contains data and a next pointer. Traversal starts from head and repeatedly follows next until the pointer is null. To compute a sum, keep an accumulator, add each node's value, then advance to the next node.",
+      "history": "Student's last three attempts on this problem:\n1. 15:10 returned zero for every non-empty list, tests 1/5.\n2. 15:16 added an accumulator but never moved past head, tests timed out.\n3. 15:20 advanced the pointer before reading data, missed the first node, tests 2/5.\nHints already given: none.",
+      "solution": "Reference solution (instructor only):\nint sumList(Node* head) {\n    int sum = 0;\n    Node* cur = head;\n    while (cur != nullptr) {\n        sum += cur->data;\n        cur = cur->next;\n    }\n    return sum;\n}",
+      "profiles": {
+        "strong": "Student profile from the course record: linked-list traversal mastered (0.88), pointers mastered (0.83), arrays mastered (0.94), this is their first linked-list error this lab.",
+        "novice": "Student profile from the course record: linked-list traversal not yet demonstrated (0.21), pointers developing (0.49), needed repeated attempts on pointer update exercises."
+      }
+    }
   }
 }

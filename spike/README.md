@@ -15,8 +15,11 @@ system prompt alone can make an LLM tutor safe and student-aware.
 ollama serve                 # separate terminal
 bash spike/run_all.sh        # full matrix, minutes
 bash spike/demo.sh --fast    # the live demo smoke run
+python3 spike/bkt_inflation.py
+python3 spike/validate_classifier.py
 python3 spike/disclosure.py  # ladder analysis -> results/why_kt.png
 python3 spike/aggregate.py   # -> results/summary.json
+python3 spike/leakage.py --problems list_sum --attacks L1 --samples 1 --prompts hardened
 ```
 
 ## Layout
@@ -26,6 +29,8 @@ python3 spike/aggregate.py   # -> results/summary.json
 | `leakage.py` | harness: model × prompt × context × profile × attack × sample |
 | `attacks.json` | attack prompts — B0 benign, A1–A6 families, X1–X10 |
 | `context.json` | RAG passages, optionally including the solution |
+| `bkt_inflation.py` | deterministic R2 exhibit: correctness-only BKT vs telemetry-adjusted BKT |
+| `validate_classifier.py`, `labels.csv` | compares human labels with `classify()` and `level()` once labels are filled |
 | `disclosure.py` | scores replies 0–5 on the ladder; produces `why_kt.png` |
 | `aggregate.py`, `chart*.py` | summaries and figures |
 | `results/` | timestamped CSV + markdown + charts. Additive, never overwritten |
@@ -74,9 +79,9 @@ adversarial replies leaked a runnable solution.
 ### 4. What was learned or disproved?
 
 The spike confirmed that prompt hardening helps, but does not solve the control
-problem. On this problem, the hardened system prompt reduced runnable-solution
-leakage by roughly 6x, but it did not reduce leakage to zero: 2-3 of 18
-adversarial replies still leaked under the hardened conditions.
+problem. On this problem, runnable-solution leakage moved from 13/18 under the
+baseline prompt to 2/18 under the hardened system prompt. It did not reduce
+leakage to zero.
 
 It also showed that putting the reference solution into retrieval context is the
 wrong direction. In the `llama3.2:3b` baseline, semantic leakage increased from
@@ -90,7 +95,9 @@ component deciding how much help to reveal.
 
 ### 5. What was changed in the project architecture or scope as a result?
 
-The POC changed the architecture in concrete ways:
+The POC changed the architecture in concrete ways. The central change is the
+**Output Guardrail**: the model may draft help, but a separate comparator checks
+the produced answer against the reference solution before anything is shown.
 
 - D1: the disclosure policy chooses the level before the model is called; the
   model only renders that chosen level.
@@ -107,8 +114,9 @@ The POC changed the architecture in concrete ways:
 
 ## Known limitations — state these before you are asked
 
-- `classify()` and `semantic()` are regex heuristics, **not yet validated against
-  human labels** (T3).
-- One problem (`fact()`), one language, 2–3 local models. Not a general benchmark.
+- `classify()` and `semantic()` are English-language regex heuristics, **not yet
+  validated against human labels** (T3).
+- One problem (`fact()` in C++), one language, 2–3 local models. Not a general
+  benchmark.
 - n = 18 adversarial replies per condition; no confidence intervals yet (T7).
 - Temperature 0.7 — replies vary run to run. That variance is itself a finding.

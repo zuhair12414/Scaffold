@@ -103,25 +103,29 @@ hardening reduces runnable-solution leakage 9x, but not to zero.
 full CSV: spike/results/demo-20260910-1902/leakage.csv
 ```
 
-### 3.2 `spike/mastery.py` — the R2 exhibit
+### 3.2 `spike/bkt_inflation.py` — the R2 exhibit
 Second, independent spike. **No Ollama, no network.** Simulates a cohort with
 known ground-truth mastery, fits BKT, injects delegation at 0/25/50%, and
 measures mastery inflation for standard vs telemetry-conditioned BKT.
 
-Reference implementation already written and tested:
-`~/Desktop/Scaffold-FYP/03-prototypes/01-mastery-inflation/poc_mastery_inflation.py`
-— runs in 0.34 s, numpy + matplotlib only, BKT implemented inline (~30 lines) so
-it can be explained line by line. **Port it into `spike/` so both exhibits live
-in one repo.**
+The implementation now lives in `spike/`. It is deterministic, uses only the
+standard library, writes exact fractions, and is short enough to explain
+line by line.
 
-Its finding to preserve: conditioning the *guess* parameter removes ~60% of the
-inflation; the residual comes from BKT's *transit* term, so the learning
-parameter must be gated too. That is a genuine C.12 question-5 answer.
+Its finding to preserve: correctness-only BKT inflates mastery when correct
+submissions include delegated work, and telemetry-conditioned updates reduce
+that inflation. The exact fractions are recorded in `docs/EVIDENCE.md` A6.
 
 ### 3.3 `spike/validate_classifier.py`
-Reads a hand-labelled CSV (`spike/labels.csv`: `reply_id, human_verdict`),
-compares to `classify()` and `level()`, prints agreement and a confusion matrix.
-Without this, every number in the proposal rests on unvalidated regex.
+Reads a hand-labelled CSV (`spike/labels.csv`:
+`reply_id,problem,human_verdict,human_level,reply`), compares to `classify()` and
+`level()`, prints agreement and a confusion matrix. Until labels are filled, it
+prints `not measured yet`.
+
+### 3.4 Problem diversity
+`spike/context.json` now contains two C++ problems: recursive factorial and
+linked-list summation. `spike/leakage.py --problems list_sum --attacks L1`
+runs the secondary problem without changing the default factorial evidence path.
 
 ---
 
