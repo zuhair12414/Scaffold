@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { mockData } from '../mock/data'
 import { dayMonthTime } from './format'
-import { labShort, submissionRows, submissionStats, type SubmissionRow } from './selectors'
+import { hintEvents, labShort, submissionRows, submissionStats, type SubmissionRow } from './selectors'
 import { useCourse } from '../state/useCourse'
+import { notify } from '../state/toast'
 import type { SubmissionStatus } from '../types'
 
 type SortKey = 'student' | 'lab' | 'timestamp' | 'tests' | 'time' | 'status'
@@ -60,6 +60,7 @@ function download(rows: SubmissionRow[]) {
   link.click()
   link.remove()
   URL.revokeObjectURL(url)
+  notify(`${rows.length} rows exported to CSV`)
 }
 
 function ExpandedRow({ row }: { row: SubmissionRow }) {
@@ -99,8 +100,8 @@ function ExpandedRow({ row }: { row: SubmissionRow }) {
 }
 
 export function Submissions() {
-  const { sessionSubmissions } = useCourse()
-  const rows = useMemo(() => submissionRows(sessionSubmissions), [sessionSubmissions])
+  const { labs, sessionSubmissions, sessionHints } = useCourse()
+  const rows = useMemo(() => submissionRows(sessionSubmissions, labs, hintEvents(sessionHints, labs)), [labs, sessionHints, sessionSubmissions])
   const [labId, setLabId] = useState('all')
   const [status, setStatus] = useState('all')
   const [minTests, setMinTests] = useState(0)
@@ -144,7 +145,7 @@ export function Submissions() {
         <p>{filtered.length} of {rows.length} attempts shown</p>
       </div>
 
-      <section className="overview-stats" aria-label="Submission stats" data-testid="submission-stats">
+      <section className="overview-stats stat-strip" aria-label="Submission stats" data-testid="submission-stats">
         <div>
           <span>Attempts shown</span>
           <strong>{stats.attempts}</strong>
@@ -176,7 +177,7 @@ export function Submissions() {
           <span>Lab</span>
           <select className="sel" value={labId} onChange={(event) => setLabId(event.target.value)}>
             <option value="all">All labs</option>
-            {mockData.labs.filter((lab) => lab.status !== 'draft').map((lab) => (
+            {labs.filter((lab) => lab.status !== 'draft').map((lab) => (
               <option key={lab.id} value={lab.id}>Lab {lab.number}: {lab.title}</option>
             ))}
           </select>
@@ -225,7 +226,7 @@ export function Submissions() {
                   onClick={() => setOpenId((current) => (current === row.submission.id ? null : row.submission.id))}
                 >
                   <span>{row.student.displayName}</span>
-                  <span>{labShort(row.submission.labId)}</span>
+                  <span>{labShort(row.submission.labId, labs)}</span>
                   <span>{dayMonthTime(row.submission.timestamp)}</span>
                   <span>{row.submission.testsPassed} / {row.submission.testsPassed + row.submission.testsFailed}</span>
                   <span>{row.submission.timeOnTaskMin} min</span>

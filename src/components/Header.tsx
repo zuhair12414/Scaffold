@@ -6,9 +6,10 @@ type Props = {
   onHint: () => void
   onSubmit?: () => void
   submitState?: 'idle' | 'saved'
+  submitLabel?: string
 }
 
-export function Header({ lab, title, hintLabel, onRun, onHint, onSubmit, submitState = 'idle' }: Props) {
+export function Header({ lab, title, hintLabel, onRun, onHint, onSubmit, submitState = 'idle', submitLabel = 'Submit' }: Props) {
   return (
     <header className="hdr">
       <div className="brand">
@@ -22,7 +23,7 @@ export function Header({ lab, title, hintLabel, onRun, onHint, onSubmit, submitS
         </button>
         {onSubmit && (
           <button className="btn" onClick={onSubmit} title="Submit this attempt to your instructor" data-testid="submit-attempt">
-            {submitState === 'saved' ? 'Submitted' : 'Submit'}
+            {submitState === 'saved' ? 'Submitted' : submitLabel}
           </button>
         )}
         <button className="btn accent" onClick={onHint} title="Open the tutor">

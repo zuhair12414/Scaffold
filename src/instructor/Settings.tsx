@@ -2,15 +2,18 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { mockData } from '../mock/data'
 import { applyProjector, projectorOn } from '../state/demo'
+import { notify } from '../state/toast'
 import { useCourse } from '../state/useCourse'
 import { dayMonthTime } from './format'
-import { overviewStats } from './selectors'
+import { hintEvents, overviewStats, submissionRows } from './selectors'
 
 export function Settings() {
   const { labs, manuals, policies, sessionSubmissions, sessionHints, resetCourse } = useCourse()
   const [projector, setProjector] = useState(projectorOn)
   const [resetAt, setResetAt] = useState<string | null>(null)
-  const stats = overviewStats()
+  const allHints = hintEvents(sessionHints, labs)
+  const allSubmissions = submissionRows(sessionSubmissions, labs, allHints)
+  const stats = overviewStats({ labs, submissions: sessionSubmissions, hints: sessionHints })
   const localLabs = labs.length - mockData.labs.length
   const localManuals = manuals.length - mockData.manuals.length
   const changedPolicies = policies.filter((policy) => (
@@ -80,6 +83,7 @@ export function Settings() {
             onClick={() => {
               resetCourse()
               setResetAt(new Date().toISOString())
+              notify('Demo reset. Every screen is back to the seeded state.')
             }}
           >
             Reset demo
@@ -107,7 +111,7 @@ export function Settings() {
             <li><span>seed</span><strong>{mockData.seed}</strong></li>
             <li><span>generated at</span><strong>{dayMonthTime(mockData.generatedAt)}</strong></li>
             <li><span>students</span><strong>{stats.students}</strong></li>
-            <li><span>submissions</span><strong>{mockData.submissions.length}</strong></li>
+            <li><span>submissions</span><strong>{allSubmissions.length}</strong></li>
             <li><span>assistance requests</span><strong>{stats.hintEvents}</strong></li>
             <li><span>requests withheld</span><strong>{stats.blockedHints}</strong></li>
             <li><span>session events</span><strong>{mockData.sessionEvents.length}</strong></li>

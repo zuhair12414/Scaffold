@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { mockData } from '../mock/data'
+import { useCourse } from '../state/useCourse'
 import { mastery, percent } from './format'
-import { kcMeans, kcStat, LOW_MASTERY } from './selectors'
+import { hintEvents, kcMeans, kcStat, LOW_MASTERY, type SelectorScope } from './selectors'
 import type { KnowledgeComponentId } from '../types'
 
 const BINS = 10
@@ -16,9 +17,9 @@ function histogram(values: number[]) {
   return counts
 }
 
-function suggestedAction(kcId: KnowledgeComponentId) {
-  const stat = kcStat(kcId)
-  const ranked = kcMeans()
+function suggestedAction(kcId: KnowledgeComponentId, scope: SelectorScope) {
+  const stat = kcStat(kcId, scope)
+  const ranked = kcMeans(scope)
   const rank = ranked.findIndex((entry) => entry.kc.id === kcId) + 1
   const labs = stat.labs.map((lab) => `Lab ${lab.number}`).join(' and ')
   const position = rank === 1
@@ -39,10 +40,21 @@ function suggestedAction(kcId: KnowledgeComponentId) {
 
 export function Concepts() {
   const navigate = useNavigate()
+  const { labs, currentLab, sessionSubmissions, sessionHints } = useCourse()
+  const scope = useMemo<SelectorScope>(() => ({
+    labs,
+    currentLab,
+    submissions: sessionSubmissions,
+    hints: sessionHints,
+  }), [labs, currentLab, sessionSubmissions, sessionHints])
+  const allHints = useMemo(() => hintEvents(sessionHints, labs), [labs, sessionHints])
   const [kcId, setKcId] = useState<KnowledgeComponentId>('in-order-successor')
-  const stat = useMemo(() => kcStat(kcId), [kcId])
+  const stat = useMemo(() => kcStat(kcId, scope), [kcId, scope])
   const counts = useMemo(() => histogram(stat.values), [stat.values])
   const peak = Math.max(...counts, 1)
+  // Whole-student ticks: a count axis with 11.5 students on it is not a count axis.
+  const step = Math.max(1, Math.ceil(peak / 4))
+  const ticks = Array.from({ length: Math.floor(peak / step) + 1 }, (_, index) => index * step)
   const trend = stat.meanByLab
 
   return (
@@ -52,8 +64,10 @@ export function Concepts() {
           <p className="instructor-eyebrow">Knowledge components</p>
           <h1>Concepts</h1>
         </div>
-        <p>Adjusted for how the work was done / {mockData.students.length} students</p>
+        <p>Adjusted for how the work was done / {mockData.students.length} students / {labs.length} labs</p>
       </div>
+
+      <p className="suggested-action" data-testid="kc-action">{suggestedAction(kcId, scope)}</p>
 
       <div className="kc-toggle-row" aria-label="Knowledge component picker">
         {mockData.knowledgeComponents.map((kc) => (
@@ -77,37 +91,45 @@ export function Concepts() {
             </div>
             <span>class mean {mastery(stat.mean)}</span>
           </div>
-          <svg viewBox="0 0 620 260" role="img" aria-label={`Mastery distribution for ${stat.kc.name}`}>
-            {[0, 0.25, 0.5, 0.75, 1].map((fraction) => {
-              const y = 220 - fraction * 190
+          <svg viewBox="0 0 620 250" role="img" aria-label={`Mastery distribution for ${stat.kc.name}`} preserveAspectRatio="none">
+            {ticks.map((value) => {
+              const y = 206 - (value / peak) * 180
               return (
-                <g key={fraction}>
-                  <line x1="42" x2="600" y1={y} y2={y} className="chart-grid" />
-                  <text x="10" y={y + 4} className="chart-axis">{Math.round(fraction * peak)}</text>
+                <g key={value}>
+                  <line x1="44" x2="606" y1={y} y2={y} className="chart-grid" />
+                  <text x="12" y={y + 4} className="chart-axis">{value}</text>
                 </g>
               )
             })}
             {counts.map((count, index) => {
-              const width = 540 / BINS
-              const x = 48 + index * width
-              const height = (count / peak) * 190
+              const width = 552 / BINS
+              const x = 50 + index * width
+              const height = (count / peak) * 180
               const low = index / BINS
               return (
                 <g key={index}>
                   <rect
                     x={x}
-                    y={220 - height}
-                    width={width - 8}
+                    y={206 - height}
+                    width={width - 7}
                     height={Math.max(height, count ? 2 : 0)}
                     className={low + 0.001 < LOW_MASTERY ? 'hist-bar is-low' : 'hist-bar'}
                   >
                     <title>{`${count} students between ${low.toFixed(1)} and ${(low + 1 / BINS).toFixed(1)}`}</title>
                   </rect>
-                  {index % 2 === 0 && <text x={x} y="240" className="chart-axis">{low.toFixed(1)}</text>}
+                  <text x={x + (width - 7) / 2} y="222" className="chart-axis" textAnchor="middle">{low.toFixed(1)}</text>
                 </g>
               )
             })}
-            <text x="48" y="256" className="chart-axis">adjusted mastery, binned in tenths</text>
+            <line
+              x1={50 + LOW_MASTERY * 552}
+              x2={50 + LOW_MASTERY * 552}
+              y1="16"
+              y2="206"
+              className="threshold-line"
+            />
+            <text x={50 + LOW_MASTERY * 552 + 6} y="24" className="chart-axis">below {LOW_MASTERY.toFixed(2)}</text>
+            <text x="50" y="242" className="chart-axis">students per tenth of adjusted mastery</text>
           </svg>
         </section>
 
@@ -118,7 +140,7 @@ export function Concepts() {
               <h2>Lab by lab</h2>
             </div>
           </div>
-          <svg viewBox="0 0 380 230" role="img" aria-label={`Class mean for ${stat.kc.name} by lab`}>
+          <svg viewBox="0 0 380 230" role="img" aria-label={`Class mean for ${stat.kc.name} by lab`} preserveAspectRatio="none">
             {[0, 0.5, 1].map((value) => (
               <g key={value}>
                 <line x1="36" x2="360" y1={190 - value * 160} y2={190 - value * 160} className="chart-grid" />
@@ -146,7 +168,7 @@ export function Concepts() {
           </svg>
           <ul className="fact-list">
             <li><span>exercised by</span><strong>{stat.labs.map((lab) => `Lab ${lab.number}`).join(', ') || 'no lab yet'}</strong></li>
-            <li><span>assistance requests on those labs</span><strong>{stat.assistanceEvents} / {mockData.hintAudit.length}</strong></li>
+            <li><span>assistance requests on those labs</span><strong>{stat.assistanceEvents} / {allHints.length}</strong></li>
           </ul>
         </section>
 
@@ -173,7 +195,6 @@ export function Concepts() {
         </section>
       </div>
 
-      <p className="suggested-action" data-testid="kc-action">{suggestedAction(kcId)}</p>
     </section>
   )
 }

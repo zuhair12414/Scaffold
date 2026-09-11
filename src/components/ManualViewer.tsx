@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Markdown } from './Markdown'
 import type { ManualMeta } from '../types'
 
@@ -12,22 +12,27 @@ function sizeLabel(bytes: number) {
 // of a file uploaded in this session, or an honest line saying the file is not in
 // this browser any more. Uploaded files are shown, never parsed.
 export function ManualViewer({ manual, file, onClose }: { manual: ManualMeta; file?: File; onClose: () => void }) {
-  const [objectUrl, setObjectUrl] = useState<string | null>(null)
-  const [text, setText] = useState<string | null>(null)
+  const [text, setText] = useState<{ key: string; value: string } | null>(null)
+  const textKey = file && (file.name.endsWith('.md') || file.type.startsWith('text/'))
+    ? `${file.name}:${file.size}:${file.lastModified}`
+    : ''
+  const objectUrl = useMemo(() => (
+    file && (file.type === 'application/pdf' || file.name.endsWith('.pdf'))
+      ? URL.createObjectURL(file)
+      : null
+  ), [file])
 
   useEffect(() => {
-    if (!file) return
-    if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
-      const url = URL.createObjectURL(file)
-      setObjectUrl(url)
-      return () => URL.revokeObjectURL(url)
-    }
-    if (file.name.endsWith('.md') || file.type.startsWith('text/')) {
-      let live = true
-      file.text().then((value) => { if (live) setText(value) }).catch(() => { if (live) setText(null) })
-      return () => { live = false }
-    }
-  }, [file])
+    if (!objectUrl) return
+    return () => URL.revokeObjectURL(objectUrl)
+  }, [objectUrl])
+
+  useEffect(() => {
+    if (!file || objectUrl || !textKey) return
+    let live = true
+    file.text().then((value) => { if (live) setText({ key: textKey, value }) }).catch(() => { if (live) setText(null) })
+    return () => { live = false }
+  }, [file, objectUrl, textKey])
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose() }
@@ -37,7 +42,7 @@ export function ManualViewer({ manual, file, onClose }: { manual: ManualMeta; fi
 
   const body = () => {
     if (objectUrl) return <iframe className="manual-frame" src={objectUrl} title={manual.name} />
-    if (text !== null) return <Markdown text={text} />
+    if (text && text.key === textKey) return <Markdown text={text.value} />
     if (manual.content) return <Markdown text={manual.content} />
     if (file) {
       return (

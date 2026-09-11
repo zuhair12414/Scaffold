@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import StudentIde from './StudentIde'
+import { ToastHost } from './components/ToastHost'
 import { Concepts } from './instructor/Concepts'
 import { HintAudit } from './instructor/HintAudit'
 import { LabsManuals } from './instructor/LabsManuals'
@@ -85,6 +86,7 @@ function RoleShell() {
         <main className="role-main">
           <Outlet />
         </main>
+        <ToastHost />
       </div>
     </div>
   )

@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { mockData } from '../mock/data'
+import { useCourse } from '../state/useCourse'
 import { mastery } from './format'
-import { attentionRows, currentLab, overviewStats, studentRows } from './selectors'
+import { attentionRows, currentLab as selectCurrentLab, overviewStats, studentRows, type SelectorScope } from './selectors'
 import type { KnowledgeComponentId } from '../types'
 
 // The cell tint is mixed from the theme accent, so the heatmap follows whatever
@@ -17,16 +18,23 @@ function masteryCellStyle(value: number) {
 
 export function InstructorOverview() {
   const navigate = useNavigate()
+  const { labs, currentLab, sessionSubmissions, sessionHints } = useCourse()
+  const scope = useMemo<SelectorScope>(() => ({
+    labs,
+    currentLab,
+    submissions: sessionSubmissions,
+    hints: sessionHints,
+  }), [labs, currentLab, sessionSubmissions, sessionHints])
   const [sortKc, setSortKc] = useState<KnowledgeComponentId>('bst-invariants')
-  const rows = useMemo(() => studentRows(), [])
-  const stats = useMemo(() => overviewStats(), [])
-  const openLab = currentLab()
+  const rows = useMemo(() => studentRows(scope), [scope])
+  const stats = useMemo(() => overviewStats(scope), [scope])
+  const openLab = useMemo(() => selectCurrentLab(scope), [scope])
   const sortedRows = useMemo(
     () => [...rows].sort((a, b) => a.masteryByKc[sortKc] - b.masteryByKc[sortKc] || a.student.displayName.localeCompare(b.student.displayName)),
     [rows, sortKc],
   )
 
-  const divergentRows = attentionRows()
+  const divergentRows = useMemo(() => attentionRows(scope), [scope])
   const weakestKc = stats.weakest
   const activeRows = [...rows]
     .sort((a, b) => b.activeLabMinutes - a.activeLabMinutes)
@@ -143,7 +151,7 @@ export function InstructorOverview() {
                 <button key={row.student.id} onClick={() => navigate(`/instructor/students/${row.student.id}`)}>
                   <span>{row.student.displayName}</span>
                   <strong>{row.student.status}</strong>
-                  <small>{row.activeLabMinutes} min on Lab {openLab.number}</small>
+                  <small>{row.activeLabMinutes} min on {openLab ? `Lab ${openLab.number}` : 'the selected lab'}</small>
                 </button>
               ))}
             </div>

@@ -5,9 +5,9 @@ import { MasteryBars } from '../components/MasteryBars'
 import { editorFont, editorTheme } from '../monaco-setup'
 import { mockData } from '../mock/data'
 import { useCourse } from '../state/useCourse'
-import { submissionStats, submissionRows } from './selectors'
+import { hintEvents, submissionStats, submissionRows } from './selectors'
 import { dayMonthTime, mastery } from './format'
-import type { KnowledgeComponent, KnowledgeComponentId, MasteryPoint, MasteryTrace, SessionEvent, Submission } from '../types'
+import type { HintAuditEvent, KnowledgeComponent, KnowledgeComponentId, Lab, MasteryPoint, MasteryTrace, SessionEvent, Submission } from '../types'
 
 type ConceptBar = {
   kc: KnowledgeComponent
@@ -29,6 +29,17 @@ const EVENT_CLASS: Record<SessionEvent['kind'], string> = {
   run: 'run',
   hint_shown: 'hint',
 }
+
+// A coloured dot means nothing without this. Order matches a session: write,
+// pause, paste, compile, run, ask.
+const EVENT_LEGEND: { kind: SessionEvent['kind']; label: string }[] = [
+  { kind: 'edit_burst', label: 'edit burst' },
+  { kind: 'idle', label: 'idle gap' },
+  { kind: 'paste', label: 'paste' },
+  { kind: 'compile', label: 'compile' },
+  { kind: 'run', label: 'run tests' },
+  { kind: 'hint_shown', label: 'hint shown' },
+]
 
 function latest(values: MasteryPoint[]) {
   return values[values.length - 1]
@@ -158,7 +169,16 @@ function Timeline({ labs }: { labs: TimelineLab[] }) {
           <p className="instructor-eyebrow">Session timeline</p>
           <h2>Lab activity tracks</h2>
         </div>
+        <span>hover a marker for the detail</span>
       </div>
+      <ul className="timeline-legend" data-testid="timeline-legend">
+        {EVENT_LEGEND.map((entry) => (
+          <li key={entry.kind}>
+            <i className={`event-dot ${EVENT_CLASS[entry.kind]}`} aria-hidden="true" />
+            {entry.label}
+          </li>
+        ))}
+      </ul>
       <div className="timeline-list">
         {labs.map((lab) => (
           <div key={lab.labId} className="timeline-lab">
@@ -181,8 +201,8 @@ function Timeline({ labs }: { labs: TimelineLab[] }) {
   )
 }
 
-function SubmissionViewer({ submissions, selected, onSelect, studentId }: { submissions: Submission[]; selected: Submission; onSelect: (submission: Submission) => void; studentId: string }) {
-  const stats = submissionStats(submissionRows(submissions.filter((row) => row.id.startsWith('session-')))
+function SubmissionViewer({ submissions, selected, onSelect, studentId, labs, hints }: { submissions: Submission[]; selected: Submission; onSelect: (submission: Submission) => void; studentId: string; labs: Lab[]; hints: HintAuditEvent[] }) {
+  const stats = submissionStats(submissionRows(submissions.filter((row) => row.id.startsWith('session-')), labs, hints)
     .filter((row) => row.student?.id === studentId))
   return (
     <section className="detail-region submissions-region" data-testid="submissions-region">
@@ -199,7 +219,7 @@ function SubmissionViewer({ submissions, selected, onSelect, studentId }: { subm
       <div className="submission-workspace">
         <div className="submission-list">
           {submissions.map((submission) => {
-            const lab = mockData.labs.find((item) => item.id === submission.labId)
+            const lab = labs.find((item) => item.id === submission.labId)
             return (
               <button
                 key={submission.id}
@@ -248,7 +268,8 @@ function SubmissionViewer({ submissions, selected, onSelect, studentId }: { subm
 
 export function StudentDetail() {
   const { studentId } = useParams()
-  const { sessionSubmissions } = useCourse()
+  const { labs, sessionSubmissions, sessionHints } = useCourse()
+  const allHints = useMemo(() => hintEvents(sessionHints, labs), [labs, sessionHints])
   const student = mockData.students.find((item) => item.id === studentId)
   const traces = useMemo(
     () => mockData.masteryTraces.filter((trace) => trace.studentId === student?.id),
@@ -283,7 +304,7 @@ export function StudentDetail() {
     })
     .filter((item): item is ConceptBar => Boolean(item))
     .sort((a, b) => a.current.value - b.current.value)
-  const timelineLabs = mockData.labs
+  const timelineLabs = labs
     .filter((lab) => lab.status !== 'draft')
     .map((lab) => ({
       labId: lab.id,
@@ -323,6 +344,8 @@ export function StudentDetail() {
           selected={selectedSubmission}
           onSelect={(submission) => setSelectedSubmissionId(submission.id)}
           studentId={student.id}
+          labs={labs}
+          hints={allHints}
         />
       </div>
     </section>
