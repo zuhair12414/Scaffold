@@ -385,6 +385,13 @@ kbd { font: 11px/1 var(--font-ui); color: var(--muted); border: 0.5px solid var(
   gap: 10px;
   margin-bottom: 18px;
 }
+/* a stat strip that is not the overview's five: fit whatever it holds */
+.stat-strip {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+.stat-strip div {
+  min-height: 78px;
+}
 .overview-stats div,
 .overview-region {
   border: 1px solid var(--border);
@@ -461,8 +468,8 @@ kbd { font: 11px/1 var(--font-ui); color: var(--muted); border: 0.5px solid var(
 .heatmap-header,
 .heatmap-row {
   display: grid;
-  grid-template-columns: 108px repeat(8, 82px);
-  min-width: 764px;
+  grid-template-columns: 104px repeat(8, minmax(58px, 1fr));
+  min-width: 640px;
 }
 .heatmap-header {
   position: sticky;
@@ -473,14 +480,27 @@ kbd { font: 11px/1 var(--font-ui); color: var(--muted); border: 0.5px solid var(
 }
 .heatmap-header span,
 .heatmap-header button {
-  min-height: 44px;
-  padding: 6px;
+  display: flex;
+  align-items: center;
+  min-height: 46px;
+  padding: 6px 4px;
   color: var(--muted);
   font-size: var(--fs-label);
   font-weight: 700;
   line-height: 1.15;
   text-align: left;
   text-transform: uppercase;
+}
+/* Concept columns are narrow: centre them over their cells, let the label wrap
+   rather than clip, and drop the tracking that pushed the longest name out. */
+.heatmap-header button {
+  justify-content: center;
+  font-size: calc(var(--fs-label) - 0.5px);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-align: center;
+  /* the concept's own short name, not a shouted version of it that will not fit */
+  text-transform: none;
 }
 /* the name column stays put while the concept columns scroll under it */
 .heatmap-header span:first-child,
@@ -1022,23 +1042,23 @@ kbd { font: 11px/1 var(--font-ui); color: var(--muted); border: 0.5px solid var(
 }
 .labs-grid {
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr) 340px;
-  grid-template-areas:
-    "list form upload"
-    "list form policy";
+  grid-template-columns: 270px minmax(0, 1fr) 330px;
+  grid-template-areas: "list detail create";
+  align-items: start;
   gap: 14px;
+}
+.lab-detail-column {
+  display: grid;
+  grid-area: detail;
+  align-content: start;
+  gap: 14px;
+  min-width: 0;
 }
 .lab-list-region {
   grid-area: list;
 }
 .lab-form-region {
-  grid-area: form;
-}
-.upload-region {
-  grid-area: upload;
-}
-.policy-region {
-  grid-area: policy;
+  grid-area: create;
 }
 .lab-list {
   display: grid;
@@ -1046,9 +1066,11 @@ kbd { font: 11px/1 var(--font-ui); color: var(--muted); border: 0.5px solid var(
 }
 .lab-row {
   display: grid;
-  gap: 4px;
-  min-height: 78px;
-  padding: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 8px;
+  min-height: 62px;
+  padding: 9px 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--raised);
@@ -1074,9 +1096,8 @@ kbd { font: 11px/1 var(--font-ui); color: var(--muted); border: 0.5px solid var(
   color: var(--muted);
   font-size: var(--fs-small);
 }
-.lab-row strong {
-  color: var(--accent);
-  font-size: var(--fs-small);
+.lab-row small {
+  color: var(--faint);
 }
 .lab-form-region,
 .policy-region {
@@ -1303,9 +1324,8 @@ kbd { font: 11px/1 var(--font-ui); color: var(--muted); border: 0.5px solid var(
     grid-template-columns: 1fr;
     grid-template-areas:
       "list"
-      "form"
-      "upload"
-      "policy";
+      "detail"
+      "create";
   }
   .kc-select {
     grid-template-columns: 1fr;
@@ -1338,7 +1358,7 @@ kbd { font: 11px/1 var(--font-ui); color: var(--muted); border: 0.5px solid var(
   gap: 6px;
   min-width: 190px;
 }
-.filter-bar > label > span,
+.filter-bar > label:not(.toggle-line) > span,
 .form-label {
   color: var(--muted);
   font-size: var(--fs-label);
@@ -1354,8 +1374,11 @@ kbd { font: 11px/1 var(--font-ui); color: var(--muted); border: 0.5px solid var(
   width: 100%;
   accent-color: var(--accent);
 }
-.filter-bar .toggle-line {
+.filter-bar > label.toggle-line {
+  display: flex;
+  align-items: center;
   align-self: end;
+  min-width: 0;
 }
 .filter-note {
   flex: 1 1 220px;
@@ -1561,26 +1584,49 @@ kbd { font: 11px/1 var(--font-ui); color: var(--muted); border: 0.5px solid var(
 .concepts-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.9fr) minmax(260px, 0.75fr);
+  align-items: stretch;
   gap: 14px;
+}
+.concepts-grid > .detail-region {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 .concepts-grid svg {
   display: block;
+  flex: 1 1 auto;
   width: 100%;
-  height: auto;
+  min-height: 200px;
+  max-height: 340px;
+}
+.concepts-grid .attention-list {
+  overflow: auto;
+  max-height: 380px;
+  padding-right: 2px;
+}
+.concepts-grid .fact-list {
+  margin-bottom: 0;
 }
 .hist-bar {
   fill: var(--warn);
-  opacity: 0.62;
+  opacity: 0.68;
 }
+/* Below the threshold is not harm, so it is not red: it is the same measure,
+   drawn quieter, with the threshold marked. */
 .hist-bar.is-low {
-  fill: var(--fail);
-  opacity: 0.72;
+  fill: var(--warn);
+  opacity: 0.28;
+}
+.threshold-line {
+  stroke: var(--muted);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
 }
 .idle-dot {
   fill: var(--faint);
 }
 .suggested-action {
-  margin: 16px 0 0;
+  margin: 0 0 16px;
   padding: 14px 16px;
   border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
@@ -1724,7 +1770,7 @@ kbd { font: 11px/1 var(--font-ui); color: var(--muted); border: 0.5px solid var(
 }
 .ladder-panel li.ladder-foot {
   display: block;
-  color: var(--faint);
+  color: var(--muted);
   font-size: 11px;
   line-height: 1.5;
 }
@@ -1896,16 +1942,87 @@ kbd { font: 11px/1 var(--font-ui); color: var(--muted); border: 0.5px solid var(
   font: 12px/1.6 var(--font-code);
 }
 
-/* student pane: lab picker and attempts */
+/* student pane: lab task picker and attempts */
+.task-picker {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
 .lab-picker {
   display: grid;
   gap: 4px;
-  margin-bottom: 14px;
 }
 .lab-picker .sel {
   width: 100%;
   height: 28px;
   color: var(--text);
+}
+.task-list {
+  display: grid;
+  gap: 6px;
+}
+.task-row {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  padding: 8px 9px;
+  border: 0.5px solid var(--border);
+  border-radius: 6px;
+  background: var(--raised);
+  color: var(--text);
+  text-align: left;
+  transition: border-color var(--dur), background var(--dur), color var(--dur);
+}
+.task-row:hover,
+.task-row.selected {
+  border-color: var(--accent);
+  background: var(--tint);
+}
+.task-row span {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.task-row strong {
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+}
+.task-row em {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-row small {
+  color: var(--faint);
+  font-size: 11px;
+}
+.task-row.selected small {
+  color: var(--accent);
+}
+.active-task-strip {
+  display: grid;
+  gap: 2px;
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border: 0.5px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--tint);
+}
+.active-task-strip span {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+.active-task-strip strong {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
 }
 .problem .markdown {
   font-size: 13px;
@@ -1961,15 +2078,7 @@ kbd { font: 11px/1 var(--font-ui); color: var(--muted); border: 0.5px solid var(
 }
 
 /* labs page: per-lab stats, status and manual actions */
-.labs-grid {
-  grid-template-areas:
-    "list form stats"
-    "list form upload"
-    "list form policy";
-}
-.stats-region {
-  grid-area: stats;
-}
+/* the selected lab's cards stack inside .lab-detail-column, not in the page grid */
 .status-row {
   display: grid;
   gap: 6px;
@@ -1997,10 +2106,8 @@ kbd { font: 11px/1 var(--font-ui); color: var(--muted); border: 0.5px solid var(
   .labs-grid {
     grid-template-areas:
       "list"
-      "form"
-      "stats"
-      "upload"
-      "policy";
+      "detail"
+      "create";
   }
   .modal-backdrop {
     padding: 12px;
@@ -2008,4 +2115,179 @@ kbd { font: 11px/1 var(--font-ui); color: var(--muted); border: 0.5px solid var(
   .modal {
     max-height: 90vh;
   }
+}
+
+/* toasts */
+.toast-host {
+  position: fixed;
+  right: 20px;
+  bottom: 38px;
+  z-index: 60;
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+  pointer-events: none;
+}
+.toast {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--border-strong);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  background: var(--raised);
+  color: var(--text);
+  font-size: var(--fs-small, 13px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  animation: toast-in 160ms ease both;
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast { animation: none; }
+}
+
+/* keyboard focus, everywhere it was missing */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.heatmap-row:focus-visible,
+.data-row:focus-visible,
+.lab-row:focus-visible,
+.submission-list button:focus-visible {
+  outline-offset: -2px;
+}
+
+/* labs page: selected-lab column */
+.lab-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.lab-stat-grid div {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--base);
+}
+.lab-stat-grid span {
+  display: block;
+  color: var(--muted);
+  font-size: var(--fs-label);
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+.lab-stat-grid strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--text);
+  font-size: var(--fs-h2);
+  font-weight: 500;
+}
+.lab-controls {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+.lab-controls label {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  max-width: 260px;
+}
+.lab-controls .quiet-block {
+  margin: 0;
+}
+.status-chip {
+  width: max-content;
+  padding: 1px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+.status-chip.is-open {
+  border-color: var(--pass);
+  color: var(--pass);
+}
+.status-chip.is-draft {
+  border-color: var(--faint);
+  color: var(--faint);
+}
+.secondary-action:disabled {
+  border-color: var(--border);
+  color: var(--faint);
+  cursor: default;
+}
+.policy-region .quiet-block {
+  margin-bottom: 0;
+}
+
+.lab-row > span {
+  grid-column: 1 / -1;
+}
+.lab-row .status-chip {
+  grid-column: 2;
+  grid-row: 2;
+  justify-self: end;
+}
+.lab-row > small {
+  grid-column: 1;
+}
+
+/* student detail: legend and filling charts */
+.timeline-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0 0 14px;
+  padding: 0;
+  color: var(--muted);
+  font-size: var(--fs-label);
+  list-style: none;
+}
+.timeline-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.timeline-legend .event-dot {
+  position: static;
+  top: auto;
+  width: 11px;
+  height: 11px;
+  margin: 0;
+  border-width: 1px;
+  box-shadow: none;
+}
+.mastery-chart {
+  display: flex;
+  flex-direction: column;
+}
+.mastery-chart svg {
+  flex: 1 1 auto;
+  min-height: 260px;
+  max-height: 360px;
+}
+.student-detail-grid > .detail-region {
+  min-height: 0;
+}
+.concept-bar-list {
+  align-content: start;
+}
+.mastery-chart,
+.timeline-region {
+  align-self: start;
+}
+.mastery-chart svg {
+  max-height: none;
 }

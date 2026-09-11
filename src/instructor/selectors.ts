@@ -14,6 +14,13 @@ import type {
 
 export const LOW_MASTERY = 0.35
 
+export type SelectorScope = {
+  labs?: Lab[]
+  submissions?: Submission[]
+  hints?: HintAuditEvent[]
+  currentLab?: Lab | null
+}
+
 export type StudentRow = {
   student: Student
   masteryByKc: Record<KnowledgeComponentId, number>
@@ -31,21 +38,40 @@ function last(points: MasteryPoint[]) {
   return points[points.length - 1]
 }
 
-export function currentLab(): Lab {
-  return mockData.labs.find((lab) => lab.status === 'open') ?? mockData.labs[mockData.labs.length - 1]
+function scopedLabs(scope?: SelectorScope) {
+  return scope?.labs ?? mockData.labs
 }
 
-export function labById(labId: string) {
-  return mockData.labs.find((lab) => lab.id === labId)
+function scopedHints(scope?: SelectorScope) {
+  const labs = scopedLabs(scope)
+  const labIds = new Set(labs.map((lab) => lab.id))
+  const live = scope?.hints ?? []
+  return [...mockData.hintAudit, ...live].filter((event) => labIds.has(event.labId) && studentById(event.studentId))
 }
 
-export function labLabel(labId: string) {
-  const lab = labById(labId)
+function scopedSubmissions(scope?: SelectorScope) {
+  const labs = scopedLabs(scope)
+  const labIds = new Set(labs.map((lab) => lab.id))
+  return [...mockData.submissions, ...(scope?.submissions ?? [])].filter((submission) => labIds.has(submission.labId))
+}
+
+export function currentLab(scope?: SelectorScope): Lab {
+  const labs = scopedLabs(scope)
+  if (scope?.currentLab && labs.some((lab) => lab.id === scope.currentLab?.id)) return scope.currentLab
+  return labs.find((lab) => lab.status === 'open') ?? labs[labs.length - 1] ?? mockData.labs[mockData.labs.length - 1]
+}
+
+export function labById(labId: string, labs: Lab[] = mockData.labs) {
+  return labs.find((lab) => lab.id === labId)
+}
+
+export function labLabel(labId: string, labs: Lab[] = mockData.labs) {
+  const lab = labById(labId, labs)
   return lab ? `Lab ${lab.number}: ${lab.title}` : labId
 }
 
-export function labShort(labId: string) {
-  const lab = labById(labId)
+export function labShort(labId: string, labs: Lab[] = mockData.labs) {
+  const lab = labById(labId, labs)
   return lab ? `Lab ${lab.number}` : labId
 }
 
@@ -66,17 +92,15 @@ export function mean(values: number[]) {
   return values.reduce((sum, value) => sum + value, 0) / values.length
 }
 
-let cachedRows: StudentRow[] | null = null
-
-export function studentRows(): StudentRow[] {
-  if (cachedRows) return cachedRows
-  const openLab = currentLab()
-  cachedRows = mockData.students.map((student) => {
+export function studentRows(scope?: SelectorScope): StudentRow[] {
+  const openLab = currentLab(scope)
+  const submissionsSource = scopedSubmissions(scope)
+  return mockData.students.map((student) => {
     const traces = mockData.masteryTraces.filter((trace) => trace.studentId === student.id)
     const masteryByKc = Object.fromEntries(
       traces.map((trace) => [trace.kcId, last(trace.telemetryAdjusted).value]),
     ) as Record<KnowledgeComponentId, number>
-    const submissions = mockData.submissions.filter((submission) => submission.studentId === student.id)
+    const submissions = submissionsSource.filter((submission) => submission.studentId === student.id)
     return {
       student,
       masteryByKc,
@@ -94,15 +118,14 @@ export function studentRows(): StudentRow[] {
       ), ''),
     }
   })
-  return cachedRows
 }
 
-export function studentRow(studentId: string) {
-  return studentRows().find((row) => row.student.id === studentId)
+export function studentRow(studentId: string, scope?: SelectorScope) {
+  return studentRows(scope).find((row) => row.student.id === studentId)
 }
 
-export function attentionRows() {
-  return studentRows()
+export function attentionRows(scope?: SelectorScope) {
+  return studentRows(scope)
     .filter((row) => row.student.divergent)
     .sort((a, b) => b.gap - a.gap)
 }
@@ -118,32 +141,37 @@ export type KcStat = {
   assistanceEvents: number
 }
 
-export function kcStat(kcId: KnowledgeComponentId): KcStat {
-  const rows = studentRows()
+export function kcStat(kcId: KnowledgeComponentId, scope?: SelectorScope): KcStat {
+  const rows = studentRows(scope)
   const kc = kcById(kcId)
   const values = rows.map((row) => row.masteryByKc[kcId])
-  const labs = mockData.labs.filter((lab) => lab.kcIds.includes(kcId))
-  const labIds = new Set(labs.map((lab) => lab.id))
-  const assistanceEvents = mockData.hintAudit.filter((event) => labIds.has(event.labId)).length
+  const labs = scopedLabs(scope)
+  const allHints = scopedHints(scope)
+  const exercisedLabs = labs.filter((lab) => lab.kcIds.includes(kcId))
+  const labIds = new Set(exercisedLabs.map((lab) => lab.id))
+  const assistanceEvents = allHints.filter((event) => labIds.has(event.labId)).length
   const traces = mockData.masteryTraces.filter((trace) => trace.kcId === kcId)
   return {
     kc,
     values,
     mean: mean(values),
     below: rows.filter((row) => row.masteryByKc[kcId] < LOW_MASTERY).sort((a, b) => a.masteryByKc[kcId] - b.masteryByKc[kcId]),
-    labs,
-    meanByLab: mockData.labs.map((lab, index) => ({
-      lab,
-      value: mean(traces.map((trace) => trace.telemetryAdjusted[index].value)),
-    })),
+    labs: exercisedLabs,
+    meanByLab: labs.flatMap((lab, index) => {
+      const valuesForLab = traces.flatMap((trace) => {
+        const point = trace.telemetryAdjusted[index]
+        return point ? [point.value] : []
+      })
+      return valuesForLab.length ? [{ lab, value: mean(valuesForLab) }] : []
+    }),
     assistanceEvents,
-    assistanceShare: mockData.hintAudit.length ? assistanceEvents / mockData.hintAudit.length : 0,
+    assistanceShare: allHints.length ? assistanceEvents / allHints.length : 0,
   }
 }
 
-export function kcMeans() {
+export function kcMeans(scope?: SelectorScope) {
   return mockData.knowledgeComponents
-    .map((kc) => ({ kc, value: mean(studentRows().map((row) => row.masteryByKc[kc.id])) }))
+    .map((kc) => ({ kc, value: mean(studentRows(scope).map((row) => row.masteryByKc[kc.id])) }))
     .sort((a, b) => a.value - b.value)
 }
 
@@ -155,14 +183,12 @@ export type SubmissionRow = {
   live: boolean
 }
 
-let cachedSubmissionRows: SubmissionRow[] | null = null
-
-function toRow(submission: Submission, live: boolean): SubmissionRow {
+function toRow(submission: Submission, live: boolean, labs: Lab[], hints: HintAuditEvent[]): SubmissionRow {
   return {
     submission,
     student: studentById(submission.studentId) as Student,
-    lab: labById(submission.labId) as Lab,
-    hints: mockData.hintAudit.filter((event) => (
+    lab: labById(submission.labId, labs) as Lab,
+    hints: hints.filter((event) => (
       event.studentId === submission.studentId && event.labId === submission.labId
     )),
     live,
@@ -171,10 +197,15 @@ function toRow(submission: Submission, live: boolean): SubmissionRow {
 
 // `live` rows are attempts submitted from the student view in this browser. They
 // are the only rows that did not come from the seed, and every screen labels them.
-export function submissionRows(live: Submission[] = []): SubmissionRow[] {
-  if (!cachedSubmissionRows) cachedSubmissionRows = mockData.submissions.map((row) => toRow(row, false))
-  if (!live.length) return cachedSubmissionRows
-  return [...cachedSubmissionRows, ...live.filter((row) => labById(row.labId) && studentById(row.studentId)).map((row) => toRow(row, true))]
+export function submissionRows(live: Submission[] = [], labs: Lab[] = mockData.labs, hints: HintAuditEvent[] = mockData.hintAudit): SubmissionRow[] {
+  const labIds = new Set(labs.map((lab) => lab.id))
+  const seedRows = mockData.submissions
+    .filter((row) => labIds.has(row.labId) && studentById(row.studentId))
+    .map((row) => toRow(row, false, labs, hints))
+  const liveRows = live
+    .filter((row) => labIds.has(row.labId) && studentById(row.studentId))
+    .map((row) => toRow(row, true, labs, hints))
+  return [...seedRows, ...liveRows]
 }
 
 export type SubmissionStats = {
@@ -205,24 +236,29 @@ export function submissionStats(rows: SubmissionRow[]): SubmissionStats {
   }
 }
 
-export function labStats(labId: string, live: Submission[] = []) {
-  return submissionStats(submissionRows(live).filter((row) => row.submission.labId === labId))
+export function labStats(labId: string, live: Submission[] = [], labs: Lab[] = mockData.labs, hints: HintAuditEvent[] = mockData.hintAudit) {
+  return submissionStats(submissionRows(live, labs, hints).filter((row) => row.submission.labId === labId))
 }
 
-export function hintEvents(live: HintAuditEvent[] = []) {
-  return [...mockData.hintAudit, ...live].sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+export function hintEvents(live: HintAuditEvent[] = [], labs: Lab[] = mockData.labs) {
+  const labIds = new Set(labs.map((lab) => lab.id))
+  return [...mockData.hintAudit, ...live]
+    .filter((event) => labIds.has(event.labId) && studentById(event.studentId))
+    .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
 }
 
-export function overviewStats() {
-  const rows = studentRows()
-  const weakest = kcMeans()[0]
+export function overviewStats(scope?: SelectorScope) {
+  const labs = scopedLabs(scope)
+  const rows = studentRows(scope)
+  const hints = hintEvents(scope?.hints ?? [], labs)
+  const weakest = kcMeans(scope)[0]
   return {
     students: rows.length,
     struggling: rows.filter((row) => row.student.status === 'struggling').length,
-    divergent: attentionRows().length,
+    divergent: attentionRows(scope).length,
     weakest,
-    gradedLabs: mockData.labs.filter((lab) => lab.status === 'closed').length,
-    blockedHints: mockData.hintAudit.filter((event) => event.blocked).length,
-    hintEvents: mockData.hintAudit.length,
+    gradedLabs: labs.filter((lab) => lab.status === 'closed').length,
+    blockedHints: hints.filter((event) => event.blocked).length,
+    hintEvents: hints.length,
   }
 }

@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { mockData } from '../mock/data'
 import { dayMonthTime, percent } from './format'
 import { hintEvents, labShort, studentName } from './selectors'
 import { useCourse } from '../state/useCourse'
@@ -37,8 +36,8 @@ function Expanded({ event }: { event: HintAuditEvent }) {
 }
 
 export function HintAudit() {
-  const { sessionHints } = useCourse()
-  const events = useMemo(() => hintEvents(sessionHints), [sessionHints])
+  const { labs, sessionHints } = useCourse()
+  const events = useMemo(() => hintEvents(sessionHints, labs), [labs, sessionHints])
   const [labId, setLabId] = useState('all')
   const [blockedOnly, setBlockedOnly] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
@@ -64,7 +63,7 @@ export function HintAudit() {
           <span>Lab</span>
           <select className="sel" value={labId} onChange={(event) => setLabId(event.target.value)}>
             <option value="all">All labs</option>
-            {mockData.labs.filter((lab) => lab.status !== 'draft').map((lab) => (
+            {labs.filter((lab) => lab.status !== 'draft').map((lab) => (
               <option key={lab.id} value={lab.id}>Lab {lab.number}: {lab.title}</option>
             ))}
           </select>
@@ -105,7 +104,7 @@ export function HintAudit() {
                   onClick={() => setOpenId((current) => (current === event.id ? null : event.id))}
                 >
                   <span>{studentName(event.studentId)}</span>
-                  <span>{labShort(event.labId)}</span>
+                  <span>{labShort(event.labId, labs)}</span>
                   <span>{dayMonthTime(event.timestamp)}</span>
                   <span>Level {event.level}</span>
                   <span>{event.similarity.toFixed(2)} / {event.threshold.toFixed(2)}</span>

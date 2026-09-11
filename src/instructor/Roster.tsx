@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useCourse } from '../state/useCourse'
 import { dayMonth, mastery } from './format'
-import { studentRows, type StudentRow } from './selectors'
+import { studentRows, type SelectorScope, type StudentRow } from './selectors'
 import type { StudentStatus } from '../types'
 
 type SortKey = 'student' | 'status' | 'verified' | 'gap' | 'labs' | 'minutes'
@@ -28,7 +29,14 @@ function sortValue(row: StudentRow, key: SortKey): string | number {
 
 export function Roster() {
   const navigate = useNavigate()
-  const rows = useMemo(() => studentRows(), [])
+  const { labs, currentLab, sessionSubmissions, sessionHints } = useCourse()
+  const scope = useMemo<SelectorScope>(() => ({
+    labs,
+    currentLab,
+    submissions: sessionSubmissions,
+    hints: sessionHints,
+  }), [labs, currentLab, sessionSubmissions, sessionHints])
+  const rows = useMemo(() => studentRows(scope), [scope])
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('all')
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'student', dir: 'asc' })

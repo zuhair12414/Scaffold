@@ -27,6 +27,7 @@ export function ProblemPane({
   selectedLabId = '',
   onSelectLab,
   attempts = [],
+  labAttemptCounts = {},
   onOpenManual,
   closed = false,
 }: {
@@ -41,32 +42,68 @@ export function ProblemPane({
   selectedLabId?: string
   onSelectLab?: (labId: string) => void
   attempts?: Submission[]
+  labAttemptCounts?: Record<string, number>
   onOpenManual?: (manual: ManualMeta) => void
   closed?: boolean
 }) {
   const best = attempts.reduce((top, attempt) => Math.max(top, attempt.testsPassed), 0)
   const minutes = attempts.reduce((sum, attempt) => sum + attempt.timeOnTaskMin, 0)
+  const selectedLab = labs.find((lab) => lab.id === selectedLabId) ?? null
 
   return (
     <aside className={'pane problem' + (collapsed ? ' collapsed' : '')} aria-label="Problem">
       <div className="rail">{p.lab} · {p.title}</div>
       {onSelectLab && labs.length > 0 && (
-        <label className="lab-picker">
-          <span className="sec">Your labs</span>
-          <select
-            className="sel"
-            value={selectedLabId}
-            onChange={(event) => onSelectLab(event.target.value)}
-            data-testid="student-lab-picker"
-          >
-            <option value="">Practice: {p.id === 'P02' ? 'Factorial, recursively' : 'built-in problem'}</option>
-            {labs.map((lab) => (
-              <option key={lab.id} value={lab.id}>
-                Lab {lab.number}: {lab.title}{lab.status === 'closed' ? ' (closed)' : ''}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="task-picker" data-testid="student-task-picker">
+          <label className="lab-picker">
+            <span className="sec">Instructor lab tasks</span>
+            <select
+              className="sel"
+              value={selectedLabId}
+              onChange={(event) => onSelectLab(event.target.value)}
+              data-testid="student-lab-picker"
+            >
+              <option value="">Practice: {p.id === 'P02' ? 'Factorial, recursively' : 'built-in problem'}</option>
+              {labs.map((lab) => (
+                <option key={lab.id} value={lab.id}>
+                  Lab {lab.number}: {lab.title}{lab.status === 'closed' ? ' (closed)' : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="task-list" aria-label="Available lab tasks">
+            {labs.map((lab) => {
+              const selected = lab.id === selectedLabId
+              const attemptsForLab = labAttemptCounts[lab.id] ?? 0
+              return (
+                <button
+                  key={lab.id}
+                  type="button"
+                  className={'task-row' + (selected ? ' selected' : '')}
+                  onClick={() => onSelectLab(lab.id)}
+                  aria-current={selected ? 'true' : undefined}
+                  data-testid={`open-lab-${lab.id}`}
+                >
+                  <span>
+                    <strong>Lab {lab.number}</strong>
+                    <em>{lab.title}</em>
+                  </span>
+                  <small>
+                    {lab.status === 'closed' ? 'Closed' : 'Open'}
+                    {attemptsForLab > 0 ? ` · ${attemptsForLab} submitted` : ''}
+                    {lab.id.startsWith('local-lab-') ? ' · this session' : ''}
+                  </small>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+      {selectedLab && (
+        <div className="active-task-strip" data-testid="active-task-strip">
+          <span>Current task</span>
+          <strong>Lab {selectedLab.number}: {selectedLab.title}</strong>
+        </div>
       )}
       <h1>{p.title}</h1>
       {closed && (
@@ -90,10 +127,10 @@ export function ProblemPane({
           </ul>
         </>
       )}
-      {policy && (
+      {policy && policy.maxHintLevel < 4 && (
         <>
           <div className="sec">Hint policy</div>
-          <p className="hint-policy-note">Hints capped at Level {policy.maxHintLevel}</p>
+          <p className="hint-policy-note">Your instructor capped hints at Level {policy.maxHintLevel} for this lab</p>
         </>
       )}
       {p.examples.length > 0 && (

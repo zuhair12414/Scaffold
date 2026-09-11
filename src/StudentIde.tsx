@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { Header } from './components/Header'
 import { ProblemPane } from './components/ProblemPane'
 import { CodeEditor, type EditorActions } from './components/CodeEditor'
@@ -13,6 +13,7 @@ import type { HintProvider } from './providers/HintProvider'
 import { useCourse } from './state/useCourse'
 import { ManualViewer } from './components/ManualViewer'
 import { mockData } from './mock/data'
+import { notify } from './state/toast'
 import type { ContextMode, HintResponse, KnowledgeComponentId, Level, ManualMeta, ProfileMode, PromptVariant, StruggleSignal, TelemetryEvent } from './types'
 import prompts from './providers/prompts.json'
 
@@ -31,6 +32,22 @@ const DEFAULT_KC_IDS: KnowledgeComponentId[] = ['recursion-base-case', 'linked-l
 const MODEL: string = import.meta.env.VITE_OLLAMA_MODEL || 'qwen2.5-coder:7b'
 // PoC-lite: hide everything that implies a finished subsystem. Set VITE_UI=full to see the full shell.
 const LITE: boolean = import.meta.env.VITE_UI !== 'full'
+const EMPTY_HINT_CARDS: HintCard[] = []
+
+function useKeyedState<T>(key: string, initial: T): [T, Dispatch<SetStateAction<T>>] {
+  const [state, setState] = useState<{ key: string; value: T }>({ key, value: initial })
+  const value = state.key === key ? state.value : initial
+  const setValue: Dispatch<SetStateAction<T>> = useCallback((next) => {
+    setState((previous) => {
+      const current = previous.key === key ? previous.value : initial
+      return {
+        key,
+        value: typeof next === 'function' ? (next as (current: T) => T)(current) : next,
+      }
+    })
+  }, [initial, key])
+  return [value, setValue]
+}
 
 
 export default function StudentIde() {
@@ -58,13 +75,14 @@ export default function StudentIde() {
     () => (activeLab ? registerLabProblem(activeLab) : baseProblem),
     [activeLab, baseProblem],
   )
+  const workspaceKey = `${p.id}:${p.starter}`
   const activeManuals = activeLab ? manuals.filter((manual) => activeLab.manualIds.includes(manual.id)) : []
   const activePolicy = activeLab
     ? policies.find((policy) => policy.labId === activeLab.id) ?? currentPolicy
     : null
   const [openManual, setOpenManual] = useState<ManualMeta | null>(null)
-  const [submitState, setSubmitState] = useState<'idle' | 'saved'>('idle')
-  const startedAt = useRef(0)
+  const [submitState, setSubmitState] = useKeyedState<'idle' | 'saved'>(workspaceKey, 'idle')
+  const startedAt = useRef<{ key: string; value: number } | null>(null)
   const attempts = useMemo(() => {
     if (!activeLab) return []
     return [
@@ -72,18 +90,29 @@ export default function StudentIde() {
       ...sessionSubmissions.filter((row) => row.labId === activeLab.id),
     ].sort((a, b) => a.timestamp.localeCompare(b.timestamp))
   }, [activeLab, sessionSubmissions])
+  const labAttemptCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const lab of assignedLabs) counts[lab.id] = 0
+    for (const row of mockData.submissions) {
+      if (row.studentId === DEMO_STUDENT_ID && row.labId in counts) counts[row.labId] += 1
+    }
+    for (const row of sessionSubmissions) {
+      if (row.studentId === DEMO_STUDENT_ID && row.labId in counts) counts[row.labId] += 1
+    }
+    return counts
+  }, [assignedLabs, sessionSubmissions])
   const [mode, setMode] = useState<'scaffold' | 'baseline'>(INITIAL_MODE)
-  const [code, setCode] = useState(p.starter)
+  const [code, setCode] = useKeyedState(workspaceKey, p.starter)
   const [cursor, setCursor] = useState({ ln: 1, col: 1 })
   const [problemOpen, setProblemOpen] = useState(true)
   const [tutorOpen, setTutorOpen] = useState(false)
-  const [outputOpen, setOutputOpen] = useState(false)
+  const [outputOpen, setOutputOpen] = useKeyedState(workspaceKey, false)
   const [tab, setTab] = useState<'diagnostics' | 'tests'>('diagnostics')
-  const [run, setRun] = useState<RunResult | null>(null)
+  const [run, setRun] = useKeyedState<RunResult | null>(workspaceKey, null)
   const [explanations, setExplanations] = useState<Record<string, string>>({})
-  const [cards, setCards] = useState<HintCard[]>([])
+  const [cards, setCards] = useKeyedState<HintCard[]>(workspaceKey, EMPTY_HINT_CARDS)
   const [thinking, setThinking] = useState(false)
-  const [highlight, setHighlight] = useState<{ lines: number[]; message: string } | null>(null)
+  const [highlight, setHighlight] = useKeyedState<{ lines: number[]; message: string } | null>(workspaceKey, null)
   const [failedRuns, setFailedRuns] = useState(0)
   const [nudge, setNudge] = useState<Nudge>('idle')
   const [snoozedUntil, setSnoozedUntil] = useState(0)
@@ -149,14 +178,8 @@ export default function StudentIde() {
   }, [tutorOpen])
 
   useEffect(() => {
-    setCode(p.starter)
-    setCards([])
-    setRun(null)
-    setOutputOpen(false)
-    setHighlight(null)
-    setSubmitState('idle')
-    startedAt.current = Date.now()
-  }, [p.id, p.starter])
+    startedAt.current = { key: workspaceKey, value: Date.now() }
+  }, [workspaceKey])
 
   // Submitting is the student's half of the loop the instructor console reads: the
   // attempt shows up in Submissions and on their own detail screen, marked as this
@@ -173,12 +196,13 @@ export default function StudentIde() {
       compileOk: !result.diagnostics.some((d) => d.severity === 'error'),
       testsPassed: passed,
       testsFailed: result.tests.length - passed,
-      timeOnTaskMin: Math.max(1, Math.round((Date.now() - (startedAt.current || Date.now())) / 60_000)),
+      timeOnTaskMin: Math.max(1, Math.round((Date.now() - (startedAt.current?.value || Date.now())) / 60_000)),
     })
     log('submit', { labId: activeLab.id, testsPassed: passed })
+    notify(`Attempt submitted: ${passed} of ${result.tests.length} tests passed. Your instructor can see it.`)
     setSubmitState('saved')
     window.setTimeout(() => setSubmitState('idle'), 2500)
-  }, [activeLab, code, p, run, submitAttempt, log])
+  }, [activeLab, code, p, run, submitAttempt, log, setRun, setOutputOpen, setSubmitState])
 
   const requestHint = useCallback(async (level: Level, trigger: HintCard['trigger'], question?: string) => {
     const requestedLevel = Math.min(level, maxHintLevel) as Level
@@ -229,7 +253,7 @@ export default function StudentIde() {
     if (res.highlightLines) setHighlight({ lines: res.highlightLines, message: res.text })
     setLastHintAt(Date.now())
     setActivitySinceHint(false)
-  }, [code, mastery, struggle, p, log, logHint, activeLab, promptVariant, systemPrompt, model, context, profile, maxHintLevel, mode, provider, similarityThreshold])
+  }, [code, mastery, struggle, p, log, logHint, activeLab, promptVariant, systemPrompt, model, context, profile, maxHintLevel, mode, provider, similarityThreshold, setCards, setHighlight])
 
   const policyLevel = useCallback((): Level => {
     const level = cards.length ? currentLevel : failedRuns >= 3 ? 1 : 0
@@ -250,7 +274,7 @@ export default function StudentIde() {
     const n = failedRuns + 1
     setFailedRuns(n)
     if (mode === 'scaffold' && n >= 2 && !tutorOpen && Date.now() > snoozedUntil && nudge !== 'nudge') setNudge('nudge')
-  }, [code, p, failedRuns, tutorOpen, snoozedUntil, nudge, explanations, log, mode, provider])
+  }, [code, p, failedRuns, tutorOpen, snoozedUntil, nudge, explanations, log, mode, provider, setRun, setOutputOpen, setHighlight])
 
   const snooze = useCallback(() => {
     setSnoozedUntil(Date.now() + SNOOZE_MS); setNudge('snoozed'); log('snooze')
@@ -274,7 +298,7 @@ export default function StudentIde() {
     toggleProblem: () => setProblemOpen((o) => !o),
     toggleOutput: () => setOutputOpen((o) => !o),
     snooze,
-  }), [doRun, requestHint, policyLevel, canEscalate.ok, log, currentLevel, maxHintLevel, snooze])
+  }), [doRun, requestHint, policyLevel, canEscalate.ok, log, currentLevel, maxHintLevel, snooze, setOutputOpen])
 
   useEffect(() => {
     actions.current = editorActions
@@ -318,6 +342,7 @@ export default function StudentIde() {
         onHint={() => setTutorOpen((o) => !o)}
         onSubmit={activeLab && activeLab.status !== 'closed' ? submit : undefined}
         submitState={submitState}
+        submitLabel={activeLab ? `Submit Lab ${activeLab.number}` : 'Submit'}
       />
       <div className="main">
         <ProblemPane
@@ -332,6 +357,7 @@ export default function StudentIde() {
           selectedLabId={selectedLabId}
           onSelectLab={selectLab}
           attempts={attempts}
+          labAttemptCounts={labAttemptCounts}
           onOpenManual={setOpenManual}
           closed={activeLab?.status === 'closed'}
         />

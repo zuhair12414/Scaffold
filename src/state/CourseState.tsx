@@ -129,9 +129,20 @@ function reducer(state: CourseState, action: Action): CourseState {
     }
   }
   if (action.type === 'delete_lab') {
+    const manualIds = new Set(state.manuals.filter((manual) => manual.labId === action.labId).map((manual) => manual.id))
+    const nextFiles = { ...state.manualFiles }
+    const nextStatusOverrides = { ...state.statusOverrides }
+    for (const manualId of manualIds) delete nextFiles[manualId]
+    delete nextStatusOverrides[action.labId]
     return {
       ...state,
       labs: state.labs.filter((lab) => lab.id !== action.labId),
+      manuals: state.manuals.filter((manual) => manual.labId !== action.labId),
+      manualFiles: nextFiles,
+      policies: state.policies.filter((policy) => policy.labId !== action.labId),
+      submissions: state.submissions.filter((submission) => submission.labId !== action.labId),
+      hints: state.hints.filter((hint) => hint.labId !== action.labId),
+      statusOverrides: nextStatusOverrides,
       hiddenLabIds: state.labs.some((lab) => lab.id === action.labId)
         ? state.hiddenLabIds
         : [...state.hiddenLabIds, action.labId],
