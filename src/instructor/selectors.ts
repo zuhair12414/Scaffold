@@ -2,6 +2,7 @@
 // numbers from here, so a figure that appears on two screens is the same
 // computation — not two that drifted apart.
 import { mockData } from '../mock/data'
+import { mastery, percent } from './format'
 import { questionsForLab, type LabQuestion } from '../mock/labQuestions'
 import type {
   ChatTurn,
@@ -459,4 +460,26 @@ export function assistanceSplit(scope?: SelectorScope): AssistanceSplit {
     withheld: hints.filter((hint) => hint.blocked).length,
     students: new Set(hints.map((hint) => hint.studentId)).size,
   }
+}
+
+// The one-line read on a concept, shown wherever that concept is opened.
+export function suggestedAction(kcId: KnowledgeComponentId) {
+  const stat = kcStat(kcId)
+  const ranked = kcMeans()
+  const rank = ranked.findIndex((entry) => entry.kc.id === kcId) + 1
+  const labs = stat.labs.map((lab) => `Lab ${lab.number}`).join(' and ')
+  const position = rank === 1
+    ? 'Weakest concept in the section'
+    : rank <= 3
+      ? `${rank}${rank === 2 ? 'nd' : 'rd'} weakest concept in the section`
+      : `Ranked ${rank} of ${ranked.length} by class mean`
+  const pressure = stat.labs.length
+    ? `${labs} ${stat.labs.length === 1 ? 'exercises' : 'exercise'} it, and ${stat.labs.length === 1 ? 'that lab carries' : 'those labs carry'} ${percent(stat.assistanceShare)} of all assistance requests`
+    : 'No lab exercises it yet, so there is no assistance signal to read'
+  const people = stat.below.length === 1
+    ? `One student sits below ${LOW_MASTERY.toFixed(2)} on the adjusted estimate`
+    : stat.below.length
+      ? `${stat.below.length} students sit below ${LOW_MASTERY.toFixed(2)} on the adjusted estimate`
+      : `No student sits below ${LOW_MASTERY.toFixed(2)} on the adjusted estimate`
+  return `${position}, class mean ${mastery(stat.mean)}. ${pressure}. ${people}.`
 }

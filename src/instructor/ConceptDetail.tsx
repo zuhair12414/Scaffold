@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
-import { mastery, percent } from './format'
-import { kcMeans, kcStat, LOW_MASTERY } from './selectors'
+import { mastery } from './format'
+import { kcStat, LOW_MASTERY, suggestedAction } from './selectors'
 import type { KnowledgeComponentId } from '../types'
 
 const BINS = 10
@@ -9,27 +9,6 @@ function histogram(values: number[]) {
   const counts = Array.from({ length: BINS }, () => 0)
   for (const value of values) counts[Math.min(BINS - 1, Math.floor(value * BINS))] += 1
   return counts
-}
-
-export function suggestedAction(kcId: KnowledgeComponentId) {
-  const stat = kcStat(kcId)
-  const ranked = kcMeans()
-  const rank = ranked.findIndex((entry) => entry.kc.id === kcId) + 1
-  const labs = stat.labs.map((lab) => `Lab ${lab.number}`).join(' and ')
-  const position = rank === 1
-    ? 'Weakest concept in the section'
-    : rank <= 3
-      ? `${rank}${rank === 2 ? 'nd' : 'rd'} weakest concept in the section`
-      : `Ranked ${rank} of ${ranked.length} by class mean`
-  const pressure = stat.labs.length
-    ? `${labs} ${stat.labs.length === 1 ? 'exercises' : 'exercise'} it, and ${stat.labs.length === 1 ? 'that lab carries' : 'those labs carry'} ${percent(stat.assistanceShare)} of all assistance requests`
-    : 'No lab exercises it yet, so there is no assistance signal to read'
-  const people = stat.below.length === 1
-    ? `One student sits below ${LOW_MASTERY.toFixed(2)} on the adjusted estimate`
-    : stat.below.length
-      ? `${stat.below.length} students sit below ${LOW_MASTERY.toFixed(2)} on the adjusted estimate`
-      : `No student sits below ${LOW_MASTERY.toFixed(2)} on the adjusted estimate`
-  return `${position}, class mean ${mastery(stat.mean)}. ${pressure}. ${people}.`
 }
 
 // The per-concept detail that used to be its own screen. It opens in place when a
