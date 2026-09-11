@@ -27,7 +27,7 @@ records what was actually built and how it was checked. Keep it short.
   precision (D14).
 - Every colour is a token from `:root` (D13). No hex in a component.
 - Vocabulary follows `docs/GLOSSARY.md`: attention, review, assistance,
-  disclosure. Never cheat / flagged / suspicious.
+  disclosure. Do not use accusatory labels.
 
 ## Checked on 2026-09-11
 
@@ -78,14 +78,59 @@ that appears in Submissions as *this session*; a hint request appears in Hint
 Audit at similarity 0.00 against the 0.60 threshold; setting Lab 5 to draft removes
 it from the student's lab list; `?demo=1` restores everything.
 
+Frontend integration pass on 2026-09-11: live course state now flows through the
+shared instructor selectors. Checked in the browser by creating a local lab,
+opening it in the student view, submitting an attempt, and confirming the same
+session row appears in Submissions and Settings. A student hint request on that
+lab also appears in Hint Audit as *this session*. A route sweep at 1366x768 and
+1280x720 covered Student, Overview, Roster, Labs & Manuals, Submissions,
+Concepts, Hint Audit and Settings; all rendered dark with no document-level
+horizontal overflow.
+
+## UI pass — what was rough and what changed
+
+- **Labs & Manuals** was three cards about the selected lab scattered around a
+  create form. It is now browse / inspect / create: the list, then everything about
+  the selected lab in one column (statistics, status, manuals, policy), then the
+  authoring form. The policy sliders also read *that lab's* policy — they used to
+  show defaults unless the lab happened to be the one in the student view.
+- **Concepts** cards stretched to unequal heights with charts floating in them. The
+  charts now fill their cards, the suggested action is read first rather than last,
+  the count axis uses whole students, and the low bins are the same amber drawn
+  quieter with the threshold marked — red stays reserved for harm or blocked.
+- **The class heatmap** clipped its eighth concept at 1366 and shouted truncated
+  headers. Columns are flexible, the headers use each concept's own short name, and
+  all eight fit without an inner scroll.
+- **Session timeline** dots had no legend. They do now.
+- **Submissions** stat strip wrapped six tiles into five and an orphan.
+- **Actions were silent.** Creating a lab, attaching or removing a manual, changing
+  a status, pushing a lab to the student view, exporting CSV, submitting an attempt
+  and resetting the demo all confirm in a corner toast.
+- **Keyboard focus** was invisible on most controls; every interactive element now
+  has a visible focus ring.
+- Smaller: the withheld-only toggle rendered stacked and shouting, the hint policy
+  line called Level 4 a cap when it caps nothing, the ladder footnote was too faint
+  to read, and long examples clipped instead of wrapping.
+
 ## Known limits — say these out loud rather than hide them
 
 - A lab authored in the console borrows the built-in problem's hint ladder, tests
   and reference solution. The six seeded labs each have their own (D18).
 - The compiler, the tests and the knowledge tracing are mocked. The guardrail is
   not: it measures real token overlap against the reference solution (D15).
-- Overview, Roster and Concepts read the seeded dataset only; attempts submitted in
-  this session appear on Submissions, Student detail and Hint Audit.
+- Overview, Roster, Concepts, Submissions, Student detail and Hint Audit all read
+  the live browser-session rows layered over the seeded dataset.
 - Session timelines are evenly spaced markers, not real timestamps on a scale.
 - Numbers on every screen are seeded demo data. The measured numbers live in
   `docs/EVIDENCE.md` and come from `spike/`.
+
+## Student task selector pass
+
+- The student problem pane now has an explicit task selector for instructor labs:
+  a dropdown plus an openable lab-task list. Selecting a row opens that lab's
+  statement, starter code, manuals, concept strip and attempt history.
+- The editor workspace, output panel, hint cards and submit state are keyed per
+  selected lab, so switching tasks does not carry a previous lab's code or output
+  into the next task.
+- The header submit action now names the active lab, for example `Submit Lab 5`,
+  and continues to store the attempt against that selected lab.
