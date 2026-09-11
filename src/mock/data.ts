@@ -1,4 +1,6 @@
+import { questionsForLab } from './labQuestions'
 import type {
+  ChatTurn,
   HintAuditEvent,
   KnowledgeComponent,
   KnowledgeComponentId,
@@ -234,24 +236,34 @@ function createSubmissions(students: Student[], labs: Lab[], random: RandomSourc
   for (const student of students) {
     for (const lab of labs) {
       if (lab.status === 'draft') continue
+      const questions = questionsForLab(lab)
       const divergentLate = student.divergent && lab.number >= 5
-      const compileOk = divergentLate || random.next() > 0.12
-      const passed = compileOk && (divergentLate || random.next() > 0.28)
-      const testsPassed = passed ? 6 : compileOk ? random.int(2, 5) : 0
-      const testsFailed = 6 - testsPassed
-      const status: SubmissionStatus = passed ? 'passed' : compileOk ? 'tests_failing' : 'compile_issue'
-      rows.push({
-        id: `${student.id}-${lab.id}-sub-01`,
-        studentId: student.id,
-        labId: lab.id,
-        timestamp: minutesAfter(labStart(lab), random.int(42, 88)),
-        code: createSubmissionCode(lab, compileOk, passed),
-        compileOk,
-        testsPassed,
-        testsFailed,
-        timeOnTaskMin: divergentLate ? random.int(8, 16) : random.int(24, 92),
-        status,
-      })
+      for (const question of questions) {
+        const compileOk = divergentLate || random.next() > 0.12
+        const passed = compileOk && (divergentLate || random.next() > 0.28)
+        const testsPassed = passed ? 6 : compileOk ? random.int(2, 5) : 0
+        const testsFailed = 6 - testsPassed
+        const status: SubmissionStatus = passed ? 'passed' : compileOk ? 'tests_failing' : 'compile_issue'
+        // The later questions in a lab are attempted later in the session.
+        const offset = (question.number - 1) * 18
+        rows.push({
+          id: `${student.id}-${question.id}-sub-01`,
+          studentId: student.id,
+          labId: lab.id,
+          questionId: question.id,
+          timestamp: minutesAfter(labStart(lab), offset + random.int(24, 52)),
+          code: divergentLate && passed
+            ? question.demo.code.full
+            : createSubmissionCode(lab, compileOk, passed),
+          compileOk,
+          testsPassed,
+          testsFailed,
+          // A student who hands over a finished answer spends a fraction of the
+          // time the rest of the section spends. That gap is the whole signal.
+          timeOnTaskMin: divergentLate ? random.int(4, 11) : random.int(16, 54),
+          status,
+        })
+      }
     }
   }
   return rows
@@ -260,6 +272,7 @@ function createSubmissions(students: Student[], labs: Lab[], random: RandomSourc
 function event(
   studentId: string,
   lab: Lab,
+  questionId: string,
   kind: SessionEventKind,
   minute: number,
   label: string,
@@ -267,9 +280,10 @@ function event(
   durationSec?: number,
 ): SessionEvent {
   return {
-    id: `${studentId}-${lab.id}-${kind}-${minute}`,
+    id: `${studentId}-${questionId}-${kind}-${minute}`,
     studentId,
     labId: lab.id,
+    questionId,
     kind,
     at: minutesAfter(labStart(lab), minute),
     durationSec,
@@ -284,13 +298,30 @@ function createSessionEvents(students: Student[], labs: Lab[], random: RandomSou
     for (const lab of labs) {
       if (lab.status === 'draft') continue
       const divergentLate = student.divergent && lab.number >= 5
-      rows.push(event(student.id, lab, 'edit_burst', 4, 'Edit burst', 'Started from the lab starter code.', random.int(180, 420)))
-      if (divergentLate) rows.push(event(student.id, lab, 'paste', 11, 'Paste', 'Large paste recorded as a hashed payload.', 4))
-      rows.push(event(student.id, lab, 'compile', divergentLate ? 15 : 28, 'Compile', divergentLate ? 'Compiled after a short edit window.' : 'Compile after local edits.'))
-      rows.push(event(student.id, lab, 'run', divergentLate ? 17 : 34, 'Run tests', divergentLate ? 'Tests passed quickly after compile.' : 'Mixed tests before revision.'))
-      if (!divergentLate && random.next() > 0.45) rows.push(event(student.id, lab, 'idle', 42, 'Idle gap', 'No editor activity for this interval.', random.int(260, 780)))
-      rows.push(event(student.id, lab, 'hint_shown', divergentLate ? 20 : 49, 'Hint shown', divergentLate ? 'Hint held to a lower disclosure level.' : 'Conceptual hint shown.'))
-      if (!divergentLate) rows.push(event(student.id, lab, 'edit_burst', 58, 'Edit burst', 'Revised after feedback.', random.int(240, 600)))
+      for (const question of questionsForLab(lab)) {
+        const base = (question.number - 1) * 18
+        const q = question.id
+        if (divergentLate) {
+          // The shape the dashboard is built to surface: almost no writing, one
+          // large paste, then a compile and a passing run within a few minutes.
+          const pasted = random.int(680, 1460)
+          rows.push(event(student.id, lab, q, 'edit_burst', base + 1, 'Edit burst', `${random.int(9, 24)}s of typing, ${random.int(12, 40)} characters.`, random.int(9, 24)))
+          rows.push(event(student.id, lab, q, 'idle', base + 2, 'Idle gap', 'No editor activity for this interval.', random.int(70, 180)))
+          rows.push(event(student.id, lab, q, 'paste', base + 3, 'Paste', `${pasted} characters in one action. Stored as a length and a hash, never as text.`, 2))
+          rows.push(event(student.id, lab, q, 'compile', base + 4, 'Compile', 'First compile of the session, immediately after the paste.'))
+          rows.push(event(student.id, lab, q, 'run', base + 5, 'Run tests', 'All tests passed on the first run.'))
+          rows.push(event(student.id, lab, q, 'hint_shown', base + 6, 'Hint shown', 'Level held low: the estimate for this concept is uncertain.'))
+        } else {
+          rows.push(event(student.id, lab, q, 'edit_burst', base + 2, 'Edit burst', `${random.int(3, 8)} minutes of typing from the starter code.`, random.int(180, 460)))
+          rows.push(event(student.id, lab, q, 'compile', base + 9, 'Compile', 'Compile after local edits.'))
+          rows.push(event(student.id, lab, q, 'run', base + 10, 'Run tests', `${random.int(1, 4)} of 6 tests passed.`))
+          if (random.next() > 0.4) rows.push(event(student.id, lab, q, 'idle', base + 13, 'Idle gap', 'No editor activity for this interval.', random.int(200, 620)))
+          rows.push(event(student.id, lab, q, 'hint_shown', base + 15, 'Hint shown', 'Conceptual hint shown at the level the policy allowed.'))
+          rows.push(event(student.id, lab, q, 'edit_burst', base + 17, 'Edit burst', `${random.int(2, 6)} minutes of typing after the hint.`, random.int(150, 380)))
+          rows.push(event(student.id, lab, q, 'compile', base + 21, 'Compile', 'Compile after revision.'))
+          rows.push(event(student.id, lab, q, 'run', base + 22, 'Run tests', 'Tests passed after revision.'))
+        }
+      }
     }
   }
   return rows
@@ -308,6 +339,7 @@ function createHintAudit(students: Student[], labs: Lab[], random: RandomSource)
     for (const lab of labs) {
       if (lab.status === 'draft') continue
       const divergentLate = student.divergent && lab.number >= 5
+      const question = questionsForLab(lab)[0]
       const level = divergentLate ? 2 : (random.int(0, 3) as 0 | 1 | 2 | 3)
       const blocked = divergentLate || random.next() > 0.86
       const similarity = blocked ? rounded(random.between(0.61, 0.78)) : rounded(random.between(0.18, 0.55))
@@ -316,6 +348,7 @@ function createHintAudit(students: Student[], labs: Lab[], random: RandomSource)
         id: `${student.id}-${lab.id}-hint-01`,
         studentId: student.id,
         labId: lab.id,
+        questionId: question.id,
         timestamp: minutesAfter(labStart(lab), divergentLate ? 20 : random.int(44, 67)),
         level,
         blocked,
@@ -373,10 +406,82 @@ function createMasteryTraces(students: Student[], labs: Lab[], random: RandomSou
   return rows
 }
 
+const OPENERS = [
+  'I have read the question but I do not know where to start.',
+  'Where should I start on this one?',
+  'I think I understand the idea but not how to write it.',
+  'Can you check whether I am thinking about this the right way?',
+]
+
+const FOLLOW_UPS = [
+  'That makes sense. What should I look at in my own code?',
+  'Which line is the problem?',
+  'Can you just show me the answer?',
+  'So what do I write instead?',
+  'I tried that and the tests still fail.',
+]
+
+function createChats(
+  students: Student[],
+  labs: Lab[],
+  submissions: Submission[],
+  hints: HintAuditEvent[],
+  random: RandomSource,
+): ChatTurn[] {
+  const rows: ChatTurn[] = []
+  for (const student of students) {
+    for (const lab of labs) {
+      if (lab.status === 'draft') continue
+      for (const question of questionsForLab(lab)) {
+        const submission = submissions.find((row) => row.studentId === student.id && row.questionId === question.id)
+        if (!submission) continue
+        const divergentLate = student.divergent && lab.number >= 5
+        const start = new Date(new Date(submission.timestamp).getTime() - submission.timeOnTaskMin * 60_000)
+        const at = (minute: number) => new Date(start.getTime() + minute * 60_000).toISOString()
+        const questionHints = hints.filter((hint) => hint.studentId === student.id && hint.questionId === question.id)
+        const turn = (index: number, minute: number, role: ChatTurn['role'], text: string, extra: Partial<ChatTurn> = {}) => {
+          rows.push({
+            id: `${student.id}-${question.id}-turn-${index}`,
+            studentId: student.id,
+            labId: lab.id,
+            questionId: question.id,
+            at: at(minute),
+            role,
+            text,
+            ...extra,
+          })
+        }
+
+        turn(1, 1, 'student', divergentLate
+          ? `Can you write ${question.title.toLowerCase()} for me?`
+          : random.pick(OPENERS))
+        if (divergentLate) {
+          turn(2, 1, 'tutor', 'No — that would hand you the question. Tell me what you think the hard part is and I will work from there.', { level: 0 })
+          turn(3, 2, 'student', 'I already have something that passes, I just want to check it.')
+          turn(4, 2, 'tutor', `Then walk me through ${question.title.toLowerCase()} in your own words. If that comes easily we are done here.`, { level: 1 })
+        } else {
+          questionHints.forEach((hint, index) => {
+            turn(2 + index * 2, 3 + index * 6, 'tutor', hint.shownText, { level: hint.level, blocked: hint.blocked })
+            turn(3 + index * 2, 5 + index * 6, 'student', random.pick(FOLLOW_UPS))
+          })
+          if (!questionHints.length) {
+            turn(2, 4, 'tutor', 'Start from the case that ends the work rather than the case that continues it. Which input needs no further step?', { level: 0 })
+            turn(3, 7, 'student', random.pick(FOLLOW_UPS))
+          }
+          turn(20, Math.max(submission.timeOnTaskMin - 2, 6), 'tutor', 'That is the right read. Write it and run the tests.', { level: 1 })
+        }
+      }
+    }
+  }
+  return rows
+}
+
 function buildMockDataset(): MockDataset {
   const random = new RandomSource(SEED)
   const labs = createLabs()
   const students = createStudents(random)
+  const submissions = createSubmissions(students, labs, random)
+  const hintAudit = createHintAudit(students, labs, random)
   return {
     seed: SEED,
     generatedAt: GENERATED_AT,
@@ -384,10 +489,11 @@ function buildMockDataset(): MockDataset {
     labs,
     manuals,
     students,
-    submissions: createSubmissions(students, labs, random),
+    submissions,
     sessionEvents: createSessionEvents(students, labs, random),
-    hintAudit: createHintAudit(students, labs, random),
+    hintAudit,
     masteryTraces: createMasteryTraces(students, labs, random),
+    chats: createChats(students, labs, submissions, hintAudit, random),
   }
 }
 

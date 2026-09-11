@@ -142,6 +142,9 @@ export type Submission = {
   id: string
   studentId: string
   labId: string
+  // Every lab is a list of questions, even when it has only one. An attempt is
+  // always against a question, never against a lab as a whole.
+  questionId: string
   timestamp: string
   code: string
   compileOk: boolean
@@ -157,6 +160,7 @@ export type SessionEvent = {
   id: string
   studentId: string
   labId: string
+  questionId: string
   kind: SessionEventKind
   at: string
   durationSec?: number
@@ -168,6 +172,7 @@ export type HintAuditEvent = {
   id: string
   studentId: string
   labId: string
+  questionId: string
   timestamp: string
   level: Level
   blocked: boolean
@@ -193,6 +198,22 @@ export type MasteryTrace = {
   telemetryAdjusted: MasteryPoint[]
 }
 
+// One conversation per student per question. The tutor panel writes into it, the
+// instructor reads it beside the attempt it belongs to. There is no delete.
+export type ChatTurn = {
+  id: string
+  studentId: string
+  labId: string
+  questionId: string
+  at: string
+  role: 'student' | 'tutor'
+  text: string
+  pseudocode?: string
+  level?: Level
+  blocked?: boolean
+  source?: 'scaffold' | 'baseline'
+}
+
 export type MockDataset = {
   seed: number
   generatedAt: string
@@ -204,4 +225,5 @@ export type MockDataset = {
   sessionEvents: SessionEvent[]
   hintAudit: HintAuditEvent[]
   masteryTraces: MasteryTrace[]
+  chats: ChatTurn[]
 }
