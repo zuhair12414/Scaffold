@@ -14,9 +14,12 @@ type Props = {
   highlight: { lines: number[]; message: string } | null
   actions: React.MutableRefObject<EditorActions>
   lite?: boolean
+  // One Monaco model per question: switching questions switches the buffer and
+  // its undo history instead of writing the old text into the new question.
+  path?: string
 }
 
-export function CodeEditor({ value, onChange, onCursor, highlight, actions, lite = false }: Props) {
+export function CodeEditor({ value, onChange, onCursor, highlight, actions, lite = false, path = 'main.cpp' }: Props) {
   const edRef = useRef<Ed | null>(null)
   const decos = useRef<ReturnType<Ed['createDecorationsCollection']> | null>(null)
 
@@ -57,7 +60,7 @@ export function CodeEditor({ value, onChange, onCursor, highlight, actions, lite
         height="100%"
         language="cpp"
         theme={editorTheme}
-        path="main.cpp"
+        path={path}
         value={value}
         onChange={(v) => onChange(v ?? '')}
         onMount={onMount}

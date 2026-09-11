@@ -7,6 +7,10 @@ export type HintCard = HintResponse & { id: number; trigger: 'requested' | 'proa
 type Props = {
   mode: 'scaffold' | 'baseline'
   onMode: (mode: 'scaffold' | 'baseline') => void
+  // The conversation belongs to one question, and says so.
+  questionLabel: string
+  draft: string
+  onDraft: (text: string) => void
   maxHintLevel: number
   similarityThreshold: number
   lite?: boolean
@@ -140,8 +144,9 @@ function Gapped({ text }: { text: string }) {
   return <pre>{parts.map((p, i) => <span key={i}>{p}{i < parts.length - 1 && <u> </u>}</span>)}</pre>
 }
 
-export function TutorPanel({ mode, onMode, maxHintLevel, similarityThreshold, lite = false, promptVariant, onPromptVariant, systemPrompt, onSystemPrompt, model, onModel, context, onContext, profile, onProfile, cards, thinking, canEscalate, onClose, onAsk, onEscalate, onClear }: Props) {
-  const [q, setQ] = useState('')
+export function TutorPanel({ mode, onMode, questionLabel, draft, onDraft, maxHintLevel, similarityThreshold, lite = false, promptVariant, onPromptVariant, systemPrompt, onSystemPrompt, model, onModel, context, onContext, profile, onProfile, cards, thinking, canEscalate, onClose, onAsk, onEscalate, onClear }: Props) {
+  const q = draft
+  const setQ = onDraft
   const [showSys, setShowSys] = useState(false)
   const [models, setModels] = useState<string[]>([])
   useEffect(() => {
@@ -153,6 +158,7 @@ export function TutorPanel({ mode, onMode, maxHintLevel, similarityThreshold, li
   const lastLen = cards.length ? cards[cards.length - 1].text.length : 0
   useEffect(() => { listRef.current?.scrollTo({ top: listRef.current.scrollHeight }) }, [cards.length, thinking, lastLen])
   const submit = () => { onAsk(q.trim()); setQ('') }
+  const conversationNote = `This conversation belongs to ${questionLabel}. It is kept with your work; there is no delete.`
   return (
     <aside className="tutor" aria-label="Tutor">
       <div className="thead">
@@ -228,11 +234,14 @@ export function TutorPanel({ mode, onMode, maxHintLevel, similarityThreshold, li
         </div>
       )}
       <div className="cards" ref={listRef}>
+        {cards.length > 0 && <p className="chat-scope">{conversationNote}</p>}
         {cards.length === 0 && !thinking && (
           <div className="empty">{mode === 'baseline' ? (lite ? 'Ask a question. Replies are shown exactly as the model wrote them.' : 'A prompted assistant with no student model. It answers only when asked, and its replies are shown exactly as written.') : 'Hints appear here. They never contain a finished solution.'}</div>
         )}
         {cards.map((c) => c.source === 'baseline' ? <BaselineCard c={c} key={c.id} /> : (
-          <div className={'card' + (c.guardrail?.blocked ? ' withheld' : '')} key={c.id}>
+          <div key={c.id} className="turn-group">
+            {c.question && <div className="you">{c.question}</div>}
+          <div className={'card' + (c.guardrail?.blocked ? ' withheld' : '')}>
             <Ladder level={c.level} />
             {c.guardrail?.blocked && (
               <p className="withheld-line" data-testid="withheld-card">
@@ -241,6 +250,7 @@ export function TutorPanel({ mode, onMode, maxHintLevel, similarityThreshold, li
             )}
             <p>{c.text}</p>
             {c.pseudocode && <Gapped text={c.pseudocode} />}
+          </div>
           </div>
         ))}
         {thinking && !cards.some((c) => c.streaming) && <div className="thinking">Thinking</div>}
