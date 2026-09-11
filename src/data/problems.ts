@@ -1,5 +1,6 @@
 import { labContent, type LabChecks, type LabHint, type LabTest } from '../mock/labContent'
 import { mockData } from '../mock/data'
+import { questionsForLab, type LabQuestion } from '../mock/labQuestions'
 import type { Lab } from '../types'
 
 export type HintSpec = LabHint
@@ -133,4 +134,37 @@ export function registerLabProblem(lab: Lab): Problem {
   return built
 }
 
-for (const lab of mockData.labs) registerLabProblem(lab)
+for (const lab of mockData.labs) {
+  registerLabProblem(lab)
+  for (const question of questionsForLab(lab)) registerQuestionProblem(question, lab)
+}
+
+// A question is a problem: same lookup, same guardrail, same tutor. Registering it
+// means nothing downstream has to know whether it came from a lab with one
+// question or with three.
+export function registerQuestionProblem(question: LabQuestion, lab: Lab): Problem {
+  const existing = problems[question.id]
+  if (existing) return existing
+  const concepts = question.kcIds.map((kcId) => {
+    const kc = mockData.knowledgeComponents.find((item) => item.id === kcId)
+    const trace = mockData.masteryTraces.find((item) => item.studentId === 'student-31' && item.kcId === kcId)
+    const point = trace?.telemetryAdjusted[trace.telemetryAdjusted.length - 1]
+    return { name: kc?.name ?? kcId.replaceAll('-', ' '), mastery: point?.value ?? 0 }
+  })
+  const built: Problem = {
+    id: question.id,
+    lab: `Lab ${lab.number} · Q${question.number}`,
+    title: question.title,
+    statement: question.statement,
+    examples: question.examples,
+    constraints: question.constraints,
+    concepts,
+    starter: question.starter,
+    solution: question.solution,
+    hints: question.hints,
+    tests: question.tests,
+    checks: question.checks,
+  }
+  problems[question.id] = built
+  return built
+}
