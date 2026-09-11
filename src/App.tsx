@@ -3,7 +3,6 @@ import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes, useLocation, u
 import StudentIde from './StudentIde'
 import { LabChooser } from './student/LabChooser'
 import { ToastHost } from './components/ToastHost'
-import { Concepts } from './instructor/Concepts'
 import { HintAudit } from './instructor/HintAudit'
 import { LabsManuals } from './instructor/LabsManuals'
 import { InstructorOverview } from './instructor/Overview'
@@ -19,7 +18,6 @@ const instructorNav = [
   { key: 'roster', label: 'Roster', path: '/instructor/roster' },
   { key: 'labs', label: 'Labs & Manuals', path: '/instructor/labs' },
   { key: 'submissions', label: 'Submissions', path: '/instructor/submissions' },
-  { key: 'concepts', label: 'Concepts', path: '/instructor/concepts' },
   { key: 'hint-audit', label: 'Hint Audit', path: '/instructor/hint-audit' },
   { key: 'settings', label: 'Settings', path: '/instructor/settings' },
 ] as const
@@ -122,7 +120,8 @@ export default function App() {
             <Route path="/instructor/roster" element={<Roster />} />
             <Route path="/instructor/labs" element={<LabsManuals />} />
             <Route path="/instructor/submissions" element={<Submissions />} />
-            <Route path="/instructor/concepts" element={<Concepts />} />
+            {/* Concepts folded into the Overview's easy mode (D23); old links still land. */}
+            <Route path="/instructor/concepts" element={<Navigate to="/instructor/overview" replace />} />
             <Route path="/instructor/hint-audit" element={<HintAudit />} />
             <Route path="/instructor/settings" element={<Settings />} />
             <Route path="/instructor/students/:studentId" element={<StudentDetail />} />

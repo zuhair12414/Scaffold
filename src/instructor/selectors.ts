@@ -387,3 +387,76 @@ export function chatFor(studentId: string, questionId: string, live: ChatTurn[] 
     .filter((turn) => turn.studentId === studentId && turn.questionId === questionId)
     .sort((a, b) => a.at.localeCompare(b.at))
 }
+
+// ---------------------------------------------------------------------------
+// Class-level views, for the Overview's easy mode
+// ---------------------------------------------------------------------------
+
+export type ClassPoint = {
+  lab: Lab
+  correctness: number
+  adjusted: number
+}
+
+// The thesis at class scale: what correctness says the section knows, against
+// what the adjusted estimate says, lab by lab.
+export function classSeries(scope?: SelectorScope, studentIds?: string[]): ClassPoint[] {
+  const labs = scopedLabs(scope)
+  const traces = studentIds
+    ? mockData.masteryTraces.filter((trace) => studentIds.includes(trace.studentId))
+    : mockData.masteryTraces
+  return mockData.labs.map((lab, index) => ({
+    lab: labs.find((item) => item.id === lab.id) ?? lab,
+    correctness: mean(traces.map((trace) => trace.correctnessOnly[index].value)),
+    adjusted: mean(traces.map((trace) => trace.telemetryAdjusted[index].value)),
+  }))
+}
+
+export type LabProgress = {
+  lab: Lab
+  attempts: number
+  passed: number
+  needReview: number
+  compileIssues: number
+  medianMinutes: number
+  withheld: number
+  lowVerified: number
+}
+
+export function labProgress(scope?: SelectorScope): LabProgress[] {
+  const labs = scopedLabs(scope).filter((lab) => lab.status !== 'draft')
+  const hints = scopedHints(scope)
+  const live = scope?.submissions ?? []
+  return labs.map((lab) => {
+    const rows = submissionRows(live, labs, hints).filter((row) => row.submission.labId === lab.id)
+    const stats = submissionStats(rows)
+    const lowVerified = rows.filter((row) => verifiedMasteryVerdict(row, stats.medianMinutes).flagged).length
+    return {
+      lab,
+      attempts: stats.attempts,
+      passed: stats.passed,
+      needReview: stats.needReview,
+      compileIssues: stats.compileIssues,
+      medianMinutes: stats.medianMinutes,
+      withheld: hints.filter((hint) => hint.labId === lab.id && hint.blocked).length,
+      lowVerified,
+    }
+  })
+}
+
+export type AssistanceSplit = {
+  total: number
+  shown: number
+  withheld: number
+  students: number
+}
+
+export function assistanceSplit(scope?: SelectorScope): AssistanceSplit {
+  const hints = scopedHints(scope)
+  return {
+    total: hints.length,
+    shown: hints.filter((hint) => !hint.blocked).length,
+    withheld: hints.filter((hint) => hint.blocked).length,
+    students: new Set(hints.map((hint) => hint.studentId)).size,
+  }
+}

@@ -1,25 +1,19 @@
-import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { mockData } from '../mock/data'
-import { useCourse } from '../state/useCourse'
 import { mastery, percent } from './format'
-import { hintEvents, kcMeans, kcStat, LOW_MASTERY, type SelectorScope } from './selectors'
+import { kcMeans, kcStat, LOW_MASTERY } from './selectors'
 import type { KnowledgeComponentId } from '../types'
 
 const BINS = 10
 
 function histogram(values: number[]) {
   const counts = Array.from({ length: BINS }, () => 0)
-  for (const value of values) {
-    const index = Math.min(BINS - 1, Math.floor(value * BINS))
-    counts[index] += 1
-  }
+  for (const value of values) counts[Math.min(BINS - 1, Math.floor(value * BINS))] += 1
   return counts
 }
 
-function suggestedAction(kcId: KnowledgeComponentId, scope: SelectorScope) {
-  const stat = kcStat(kcId, scope)
-  const ranked = kcMeans(scope)
+export function suggestedAction(kcId: KnowledgeComponentId) {
+  const stat = kcStat(kcId)
+  const ranked = kcMeans()
   const rank = ranked.findIndex((entry) => entry.kc.id === kcId) + 1
   const labs = stat.labs.map((lab) => `Lab ${lab.number}`).join(' and ')
   const position = rank === 1
@@ -38,59 +32,32 @@ function suggestedAction(kcId: KnowledgeComponentId, scope: SelectorScope) {
   return `${position}, class mean ${mastery(stat.mean)}. ${pressure}. ${people}.`
 }
 
-export function Concepts() {
+// The per-concept detail that used to be its own screen. It opens in place when a
+// concept is picked on the Overview, so nothing was lost when the tab went.
+export function ConceptDetail({ kcId, onClose }: { kcId: KnowledgeComponentId; onClose: () => void }) {
   const navigate = useNavigate()
-  const { labs, currentLab, sessionSubmissions, sessionHints } = useCourse()
-  const scope = useMemo<SelectorScope>(() => ({
-    labs,
-    currentLab,
-    submissions: sessionSubmissions,
-    hints: sessionHints,
-  }), [labs, currentLab, sessionSubmissions, sessionHints])
-  const allHints = useMemo(() => hintEvents(sessionHints, labs), [labs, sessionHints])
-  const [kcId, setKcId] = useState<KnowledgeComponentId>('in-order-successor')
-  const stat = useMemo(() => kcStat(kcId, scope), [kcId, scope])
-  const counts = useMemo(() => histogram(stat.values), [stat.values])
+  const stat = kcStat(kcId)
+  const counts = histogram(stat.values)
   const peak = Math.max(...counts, 1)
-  // Whole-student ticks: a count axis with 11.5 students on it is not a count axis.
   const step = Math.max(1, Math.ceil(peak / 4))
   const ticks = Array.from({ length: Math.floor(peak / step) + 1 }, (_, index) => index * step)
   const trend = stat.meanByLab
 
   return (
-    <section className="concepts-page" data-testid="concepts-page">
-      <div className="overview-heading">
+    <section className="detail-region concept-detail" data-testid="concept-detail">
+      <div className="region-title">
         <div>
-          <p className="instructor-eyebrow">Knowledge components</p>
-          <h1>Concepts</h1>
+          <p className="instructor-eyebrow">{stat.kc.name}</p>
+          <h2>Class mean {mastery(stat.mean)}</h2>
         </div>
-        <p>Adjusted for how the work was done / {mockData.students.length} students / {labs.length} labs</p>
+        <button className="linkbtn" onClick={onClose} data-testid="close-concept">Close</button>
       </div>
 
-      <p className="suggested-action" data-testid="kc-action">{suggestedAction(kcId, scope)}</p>
+      <p className="suggested-action">{suggestedAction(kcId)}</p>
 
-      <div className="kc-toggle-row" aria-label="Knowledge component picker">
-        {mockData.knowledgeComponents.map((kc) => (
-          <button
-            key={kc.id}
-            className={kc.id === kcId ? 'active' : undefined}
-            onClick={() => setKcId(kc.id)}
-            data-testid="kc-pick"
-          >
-            {kc.shortName}
-          </button>
-        ))}
-      </div>
-
-      <div className="concepts-grid">
-        <section className="detail-region" data-testid="kc-histogram">
-          <div className="region-title">
-            <div>
-              <p className="instructor-eyebrow">Distribution</p>
-              <h2>{stat.kc.name}</h2>
-            </div>
-            <span>class mean {mastery(stat.mean)}</span>
-          </div>
+      <div className="concept-detail-grid">
+        <div>
+          <p className="form-label">Distribution across the section</p>
           <svg viewBox="0 0 620 250" role="img" aria-label={`Mastery distribution for ${stat.kc.name}`} preserveAspectRatio="none">
             {ticks.map((value) => {
               const y = 206 - (value / peak) * 180
@@ -121,25 +88,14 @@ export function Concepts() {
                 </g>
               )
             })}
-            <line
-              x1={50 + LOW_MASTERY * 552}
-              x2={50 + LOW_MASTERY * 552}
-              y1="16"
-              y2="206"
-              className="threshold-line"
-            />
+            <line x1={50 + LOW_MASTERY * 552} x2={50 + LOW_MASTERY * 552} y1="16" y2="206" className="threshold-line" />
             <text x={50 + LOW_MASTERY * 552 + 6} y="24" className="chart-axis">below {LOW_MASTERY.toFixed(2)}</text>
             <text x="50" y="242" className="chart-axis">students per tenth of adjusted mastery</text>
           </svg>
-        </section>
+        </div>
 
-        <section className="detail-region" data-testid="kc-trend">
-          <div className="region-title">
-            <div>
-              <p className="instructor-eyebrow">Class mean over time</p>
-              <h2>Lab by lab</h2>
-            </div>
-          </div>
+        <div>
+          <p className="form-label">Class mean, lab by lab</p>
           <svg viewBox="0 0 380 230" role="img" aria-label={`Class mean for ${stat.kc.name} by lab`} preserveAspectRatio="none">
             {[0, 0.5, 1].map((value) => (
               <g key={value}>
@@ -168,17 +124,12 @@ export function Concepts() {
           </svg>
           <ul className="fact-list">
             <li><span>exercised by</span><strong>{stat.labs.map((lab) => `Lab ${lab.number}`).join(', ') || 'no lab yet'}</strong></li>
-            <li><span>assistance requests on those labs</span><strong>{stat.assistanceEvents} / {allHints.length}</strong></li>
+            <li><span>assistance on those labs</span><strong>{stat.assistanceEvents} requests</strong></li>
           </ul>
-        </section>
+        </div>
 
-        <section className="detail-region" data-testid="kc-below">
-          <div className="region-title">
-            <div>
-              <p className="instructor-eyebrow">Students below {LOW_MASTERY.toFixed(2)}</p>
-              <h2>{stat.below.length} to review</h2>
-            </div>
-          </div>
+        <div>
+          <p className="form-label">Students below {LOW_MASTERY.toFixed(2)}</p>
           {stat.below.length ? (
             <div className="attention-list">
               {stat.below.map((row) => (
@@ -192,9 +143,8 @@ export function Concepts() {
           ) : (
             <p className="sentence-empty">Every student in the section is above {LOW_MASTERY.toFixed(2)} on this concept.</p>
           )}
-        </section>
+        </div>
       </div>
-
     </section>
   )
 }
