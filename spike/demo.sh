@@ -40,6 +40,9 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
+echo "Known limitation: regex scoring is English-only and tuned to the recursive fact(n) C++ problem; it is spike evidence, not a validated benchmark."
+echo
+
 python3 - "$MODEL" "$OLLAMA_API" <<'PY'
 import json
 import sys
@@ -123,6 +126,6 @@ for p in prompts:
     )
 print()
 
-print("full evidence: hardening reduces runnable-solution leakage roughly 6x - but not to zero.")
+print("full evidence: recorded full run was 13/18 baseline and 2/18 hardened; not zero.")
 print(f"full CSV: {csv_path}")
 PY

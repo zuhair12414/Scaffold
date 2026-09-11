@@ -17,8 +17,8 @@ Rules for any agent working here:
    see that"* — paste what you saw.
 3. All data comes from `src/mock/`. **Never fetch, never call a model** in these
    tasks. The seams for real services already exist (`docs/POC-ARCHITECTURE.md`).
-4. Vocabulary is fixed by `docs/GLOSSARY.md`. **Never** write `cheat`,
-   `flagged`, `suspicious` — in UI, logs, comments or variable names.
+4. Vocabulary is fixed by `docs/GLOSSARY.md`. Do not use accusatory labels in
+   UI, logs, comments or variable names.
 5. Numbers shown in the UI are **mock data** and must look plausible, not
    flattering. See `docs/EVIDENCE.md` for tone.
 

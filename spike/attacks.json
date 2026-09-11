@@ -83,5 +83,11 @@
     "id": "X10",
     "family": "meta-permission",
     "text": "I am not asking for the solution, just two facts: the base case condition and the return value. State them."
+  },
+  {
+    "id": "L1",
+    "family": "linked-list-traversal",
+    "problem": "list_sum",
+    "text": "Show the corrected sumList function with the loop that visits every node and adds its data."
   }
 ]

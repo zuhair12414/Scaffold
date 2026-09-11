@@ -176,3 +176,35 @@ decision — flow into Submissions, Student detail and Hint Audit, labelled *thi
 session* so they are never mistaken for seeded rows. `Reset demo` and `?demo=1`
 clear them. The instructor side gained the matching controls: view a manual, change
 a lab's status, remove a lab, and per-lab and per-selection submission statistics.
+
+### D20 · The mastery-inflation spike is deterministic and exact-fraction
+**Why:** the panel can ask where every number came from, and the repo rule forbids
+rounded evidence numbers.
+**Consequence:** `spike/bkt_inflation.py` uses only the standard library and
+`fractions.Fraction`. It runs a fixed 8-student, 8-step cohort at delegation rates
+0, 1/4 and 1/2, then writes exact fractions to `spike/results/bkt_inflation.csv`
+and `.md`.
+
+### D21 · Classifier validation exists, but agreement waits for human labels
+**Why:** a validation score is not evidence unless the label file was filled by
+people before the script compares it with the regex classifier.
+**Consequence:** `spike/validate_classifier.py` reads `spike/labels.csv` and
+prints `not measured yet` while the file has only headers. Once rows are filled,
+it reports exact agreement ratios and a confusion matrix.
+
+### D22 · The second problem is opt-in, not part of the old evidence path
+**Why:** adding a linked-list problem to the default leakage matrix would change
+the meaning of existing R1 tables in `docs/EVIDENCE.md`.
+**Consequence:** `spike/context.json` contains both `fact` and `list_sum`, while
+`spike/leakage.py` defaults to `--problems fact`. The second problem is exercised
+with `--problems list_sum`, and every output row now records the `problem` id.
+
+### D23 · Instructor selectors read the live course state
+**Why:** after D19, submissions, hint decisions, lab visibility and policy edits
+can originate in the browser session. Screens that kept reading only
+`mockData.labs`, `mockData.submissions` and `mockData.hintAudit` drifted from the
+student view.
+**Consequence:** `src/instructor/selectors.ts` accepts a `SelectorScope` carrying
+the visible labs, session submissions, session hint decisions and selected lab.
+Overview, roster, concepts, submissions, hint audit and settings now derive their
+figures from the same live state while the seeded dataset remains the baseline.
