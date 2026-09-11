@@ -3,7 +3,7 @@ import { ManualViewer } from '../components/ManualViewer'
 import { Markdown } from '../components/Markdown'
 import { mockData } from '../mock/data'
 import { count, dayMonth, dayMonthTime, fileSize } from './format'
-import { labStats } from './selectors'
+import { labStats, questionStats } from './selectors'
 import { notify } from '../state/toast'
 import { useCourse } from '../state/useCourse'
 import type { KnowledgeComponentId, Lab, ManualMeta } from '../types'
@@ -79,6 +79,10 @@ export function LabsManuals() {
 
   const labOptions = useMemo(() => [...labs].sort((a, b) => b.number - a.number), [labs])
   const stats = useMemo(() => labStats(selectedLab.id, sessionSubmissions, labs, sessionHints), [labs, selectedLab.id, sessionHints, sessionSubmissions])
+  const perQuestion = useMemo(
+    () => questionStats(selectedLab, sessionSubmissions, [...mockData.hintAudit, ...sessionHints]),
+    [selectedLab, sessionSubmissions, sessionHints],
+  )
   const isSeeded = mockData.labs.some((lab) => lab.id === selectedLab.id)
   const isInStudentView = currentLab?.id === selectedLab.id
 
@@ -229,6 +233,38 @@ export function LabsManuals() {
                 {isSeeded ? 'Hide from the demo' : 'Delete this lab'}
               </button>
             </div>
+          </section>
+
+          <section className="detail-region questions-region" data-testid="lab-questions">
+            <div className="region-title">
+              <div>
+                <p className="instructor-eyebrow">Questions</p>
+                <h2>{perQuestion.length} in this lab</h2>
+              </div>
+            </div>
+            <ol className="question-stats">
+              {perQuestion.map((entry) => (
+                <li key={entry.question.id}>
+                  <div className="question-stat-head">
+                    <span className="question-number">Q{entry.question.number}</span>
+                    <strong>{entry.question.title}</strong>
+                    {entry.lowVerified > 0 && (
+                      <em className="flag-chip">{entry.lowVerified} low verified mastery</em>
+                    )}
+                  </div>
+                  <div className="question-stat-figures">
+                    <span>{entry.stats.attempts} attempts</span>
+                    <span>{entry.stats.passed} passing</span>
+                    <span>{entry.stats.medianMinutes} min median</span>
+                    <span>{entry.withheld} withheld</span>
+                  </div>
+                  <div className="question-stat-bar" aria-hidden="true">
+                    <i style={{ width: `${entry.passRate * 100}%` }} />
+                  </div>
+                  <p>{entry.insight}</p>
+                </li>
+              ))}
+            </ol>
           </section>
 
           <section className="detail-region upload-region">

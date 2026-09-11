@@ -2,8 +2,11 @@
 // numbers from here, so a figure that appears on two screens is the same
 // computation — not two that drifted apart.
 import { mockData } from '../mock/data'
+import { questionsForLab, type LabQuestion } from '../mock/labQuestions'
 import type {
+  ChatTurn,
   HintAuditEvent,
+  SessionEvent,
   KnowledgeComponent,
   KnowledgeComponentId,
   Lab,
@@ -261,4 +264,126 @@ export function overviewStats(scope?: SelectorScope) {
     blockedHints: hints.filter((event) => event.blocked).length,
     hintEvents: hints.length,
   }
+}
+
+// ---------------------------------------------------------------------------
+// Per question
+// ---------------------------------------------------------------------------
+
+export function questionsOf(lab: Lab) {
+  return questionsForLab(lab)
+}
+
+export function questionById(questionId: string, labs: Lab[] = mockData.labs): LabQuestion | undefined {
+  for (const lab of labs) {
+    const found = questionsForLab(lab).find((question) => question.id === questionId)
+    if (found) return found
+  }
+  return undefined
+}
+
+export function questionLabel(questionId: string, labs: Lab[] = mockData.labs) {
+  const question = questionById(questionId, labs)
+  return question ? `Q${question.number} · ${question.title}` : questionId
+}
+
+export type QuestionStat = {
+  question: LabQuestion
+  rows: SubmissionRow[]
+  stats: SubmissionStats
+  passRate: number
+  assistance: number
+  withheld: number
+  lowVerified: number
+  insight: string
+}
+
+export function questionStats(lab: Lab, live: Submission[] = [], hints: HintAuditEvent[] = mockData.hintAudit): QuestionStat[] {
+  const rows = submissionRows(live, [lab], hints).filter((row) => row.submission.labId === lab.id)
+  const classMedian = submissionStats(rows).medianMinutes
+  return questionsForLab(lab).map((question) => {
+    const questionRows = rows.filter((row) => row.submission.questionId === question.id)
+    const stats = submissionStats(questionRows)
+    const assistance = hints.filter((hint) => hint.questionId === question.id).length
+    const withheld = hints.filter((hint) => hint.questionId === question.id && hint.blocked).length
+    const lowVerified = questionRows.filter((row) => verifiedMasteryVerdict(row, classMedian).flagged).length
+    const passRate = stats.attempts ? stats.passed / stats.attempts : 0
+    const insight = !stats.attempts
+      ? 'No attempts yet.'
+      : lowVerified
+        ? `${stats.passed} of ${stats.attempts} pass, but ${lowVerified} ${lowVerified === 1 ? 'attempt pairs a pass with' : 'attempts pair a pass with'} low verified mastery. Worth reading beside the telemetry.`
+        : passRate < 0.5
+          ? `Only ${stats.passed} of ${stats.attempts} pass and the median run is ${stats.medianMinutes} minutes. This is where the section is stuck.`
+          : `${stats.passed} of ${stats.attempts} pass at a median of ${stats.medianMinutes} minutes. ${withheld} requests were withheld by the guardrail.`
+    return { question, rows: questionRows, stats, passRate, assistance, withheld, lowVerified, insight }
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Correct submission, low verified mastery
+// ---------------------------------------------------------------------------
+
+export type MasteryVerdict = {
+  flagged: boolean
+  headline: string
+  reasons: string[]
+  verifiedMean: number
+  correctnessMean: number
+  classMedianMinutes: number
+  minutes: number
+  ratio: number
+}
+
+// The rule, stated once and applied everywhere. It reads three measured things
+// and never reads intent: a pass, an adjusted estimate that has not moved, and a
+// session much shorter than the section's. It surfaces evidence for a human. It
+// is not an accusation and it is never shown as one (GLOSSARY, D9).
+export function verifiedMasteryVerdict(row: SubmissionRow, classMedianMinutes: number): MasteryVerdict {
+  const student = studentRow(row.student.id)
+  const question = questionById(row.submission.questionId)
+  const kcIds = question?.kcIds ?? row.lab.kcIds
+  const verified = student
+    ? mean(kcIds.map((kcId) => student.masteryByKc[kcId] ?? 0))
+    : 0
+  const correctness = student?.correctnessMean ?? 0
+  const minutes = row.submission.timeOnTaskMin
+  const ratio = classMedianMinutes ? minutes / classMedianMinutes : 1
+  const passed = row.submission.status === 'passed'
+  const pasted = mockData.sessionEvents.find((event) => (
+    event.studentId === row.student.id && event.questionId === row.submission.questionId && event.kind === 'paste'
+  ))
+
+  const reasons: string[] = []
+  if (passed) reasons.push(`All ${row.submission.testsPassed} tests passed on this attempt.`)
+  if (verified < 0.45) reasons.push(`Adjusted mastery across this question's concepts is ${verified.toFixed(2)}, against a correctness-only estimate of ${correctness.toFixed(2)}.`)
+  if (ratio <= 0.5) reasons.push(`Time on task was ${minutes} minutes against a class median of ${classMedianMinutes} for this lab.`)
+  if (pasted) reasons.push(`A paste event was recorded before the first compile: ${pasted.detail}`)
+
+  const flagged = passed && verified < 0.45 && ratio <= 0.5
+  return {
+    flagged,
+    headline: flagged
+      ? 'Correct submission, low verified mastery'
+      : passed
+        ? 'Correct submission, mastery estimate agrees'
+        : 'Attempt still in progress',
+    reasons,
+    verifiedMean: verified,
+    correctnessMean: correctness,
+    classMedianMinutes,
+    minutes,
+    ratio,
+  }
+}
+
+export function telemetryFor(studentId: string, questionId: string): SessionEvent[] {
+  return mockData.sessionEvents
+    .filter((event) => event.studentId === studentId && event.questionId === questionId)
+    .sort((a, b) => a.at.localeCompare(b.at))
+}
+
+export function chatFor(studentId: string, questionId: string, live: ChatTurn[] = []): ChatTurn[] {
+  return [...mockData.chats, ...live]
+    .filter((turn) => turn.studentId === studentId && turn.questionId === questionId)
+    .sort((a, b) => a.at.localeCompare(b.at))
 }
