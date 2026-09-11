@@ -208,3 +208,42 @@ student view.
 the visible labs, session submissions, session hint decisions and selected lab.
 Overview, roster, concepts, submissions, hint audit and settings now derive their
 figures from the same live state while the seeded dataset remains the baseline.
+
+### D20 · A lab is a list of questions, and the conversation belongs to the question
+**Why:** a lab was one statement with one starter file, so "Lab 5: BST delete" was
+a single wall of work with a single chat. A real CS2 lab is a sequence of
+questions that build, and a student's conversation about the successor walk is not
+the same conversation as the one about the two-child case.
+**Consequence:** `src/mock/labQuestions.ts` holds the questions. Lab 5 is written
+out properly as three — find the in-order successor, delete a leaf or one-child
+node, delete a node with two children — each with its own statement, examples,
+constraints, starter, reference solution, five-level ladder, tests and compiler
+signal. Every other lab is wrapped as a single question so nothing downstream has
+to special-case it. Each question registers as a problem, so the tutor and the
+guardrail work per question with no new plumbing. The student view keys the editor
+(one Monaco model per question), the run output and the conversation to the
+question; switching questions switches all three and **nothing is deleted** — the
+chat is kept with the work, on purpose, because the instructor reads the same
+transcript beside the attempt.
+
+### D21 · The flag is a verdict with its evidence attached, or it is an accusation
+**Why:** "correct submission, low verified mastery" is the product's whole claim.
+Shown as a badge alone it is an accusation with no way to check it (D9).
+**Consequence:** `verifiedMasteryVerdict` states the rule in one place and reads
+only measured things: the attempt passed, the adjusted estimate across that
+question's concepts is below 0.45 while correctness is high, and time on task is at
+most half the class median **for that lab**. Expanding the row shows every reason
+as a sentence with its number, the attempt against the class median as two bars,
+the telemetry for that attempt (edit bursts, idle gaps, the paste with its size,
+compiles, runs, hints — with time offsets), and the full conversation for that
+question. Nothing is inferred about intent and no row says a student did anything.
+
+### D22 · Demo-only affordances exist, and say so on screen
+**Why:** walking a panel through the product means reaching a struggling state
+fast, and typing wrong C++ live is dead air.
+**Consequence:** each question carries three code states (partial, struggling,
+working) and the questions a student plausibly asks at each. The student view
+exposes them in a panel with a dashed border reading **Demo controls · not part of
+the product**, and every fill raises a toast saying "demo only". It is declared on
+screen for the same reason the DEMO DATA badge is: a panel that finds undeclared
+help stops believing the rest.

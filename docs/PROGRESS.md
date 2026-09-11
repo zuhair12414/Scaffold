@@ -112,6 +112,26 @@ horizontal overflow.
   line called Level 4 a cap when it caps nothing, the ladder footnote was too faint
   to read, and long examples clipped instead of wrapping.
 
+## Questions, evidence and demo rails
+
+- **Lab 5 is written out as three questions** (D20). The left pane is an accordion:
+  one question open, the others collapsed, each showing whether it is passing. The
+  editor, the run output and the conversation all follow the question.
+- **The conversation is per question and is never deleted.** Seeded history exists
+  for every student on every question; anything said in this browser is appended to
+  it and is what the instructor reads.
+- **Submissions are per question**, so the console counts 329 attempts rather than
+  235, and each question has its own pass rate and median.
+- **"Low verified mastery"** is a chip on the row and a verdict in the expansion
+  (D21): the reasons as sentences, this attempt against the class median as bars,
+  the telemetry log with offsets and the paste size, and the whole conversation.
+  21 of the 329 seeded attempts meet the rule.
+- **Labs & Manuals shows each question** with attempts, passing, median, withheld
+  and a one-line insight.
+- **Demo controls** in the student pane fill the editor with a partial, struggling
+  or working state and drop a stage-appropriate question into the tutor box. They
+  are fenced in a dashed panel reading *not part of the product* (D22).
+
 ## Known limits — say these out loud rather than hide them
 
 - A lab authored in the console borrows the built-in problem's hint ladder, tests
