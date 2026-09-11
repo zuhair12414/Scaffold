@@ -5,7 +5,9 @@ import { CodeEditor, type EditorActions } from './components/CodeEditor'
 import { OutputPanel } from './components/OutputPanel'
 import { TutorPanel, type HintCard } from './components/TutorPanel'
 import { StatusBar, type Nudge } from './components/StatusBar'
-import { problems, registerLabProblem, type Problem } from './data/problems'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
+import { problems, registerQuestionProblem, type Problem } from './data/problems'
+import { questionsForLab, type DemoStage } from './mock/labQuestions'
 import { mockRun, type RunResult } from './mock/compiler'
 import { MockHintProvider } from './providers/MockHintProvider'
 import { OllamaBaselineProvider } from './providers/OllamaBaselineProvider'
@@ -14,7 +16,7 @@ import { useCourse } from './state/useCourse'
 import { ManualViewer } from './components/ManualViewer'
 import { mockData } from './mock/data'
 import { notify } from './state/toast'
-import type { ContextMode, HintResponse, KnowledgeComponentId, Level, ManualMeta, ProfileMode, PromptVariant, StruggleSignal, TelemetryEvent } from './types'
+import type { ChatTurn, ContextMode, HintResponse, KnowledgeComponentId, Level, ManualMeta, ProfileMode, PromptVariant, StruggleSignal, TelemetryEvent } from './types'
 import prompts from './providers/prompts.json'
 
 const PROBLEM = 'P02'
@@ -32,7 +34,6 @@ const DEFAULT_KC_IDS: KnowledgeComponentId[] = ['recursion-base-case', 'linked-l
 const MODEL: string = import.meta.env.VITE_OLLAMA_MODEL || 'qwen2.5-coder:7b'
 // PoC-lite: hide everything that implies a finished subsystem. Set VITE_UI=full to see the full shell.
 const LITE: boolean = import.meta.env.VITE_UI !== 'full'
-const EMPTY_HINT_CARDS: HintCard[] = []
 
 function useKeyedState<T>(key: string, initial: T): [T, Dispatch<SetStateAction<T>>] {
   const [state, setState] = useState<{ key: string; value: T }>({ key, value: initial })
@@ -51,31 +52,41 @@ function useKeyedState<T>(key: string, initial: T): [T, Dispatch<SetStateAction<
 
 
 export default function StudentIde() {
-  const baseProblem = problems[PROBLEM]
-  const { labs, currentLab, currentPolicy, manuals, manualFiles, policies, sessionSubmissions, submitAttempt, logHint } = useCourse()
-  // The student's own lab list: everything the instructor has opened or closed.
+  const navigate = useNavigate()
+  const { labId } = useParams()
+  const {
+    labs, currentLab, currentPolicy, manuals, manualFiles, policies,
+    sessionSubmissions, sessionChat, submitAttempt, logHint, appendChat,
+  } = useCourse()
   const assignedLabs = useMemo(() => (
     labs.filter((lab) => lab.status !== 'draft').sort((a, b) => b.number - a.number)
   ), [labs])
-  // The student may browse their own labs, but a lab the instructor pushes wins:
-  // a pick is remembered against the lab that was pushed when it was made, so the
-  // next push discards it. Derived, so no effect has to chase the instructor.
-  const pushedLabId = currentLab?.id ?? ''
-  const [pick, setPick] = useState<{ labId: string; against: string } | null>(null)
-  const selectedLabId = pick && pick.against === pushedLabId ? pick.labId : pushedLabId
-  const selectLab = useCallback(
-    (labId: string) => setPick({ labId, against: pushedLabId }),
-    [pushedLabId],
-  )
   const activeLab = useMemo(
-    () => assignedLabs.find((lab) => lab.id === selectedLabId) ?? null,
-    [assignedLabs, selectedLabId],
+    () => assignedLabs.find((lab) => lab.id === labId) ?? null,
+    [assignedLabs, labId],
+  )
+  const questions = useMemo(() => (activeLab ? questionsForLab(activeLab) : []), [activeLab])
+  const allAttempts = useMemo(() => [
+    ...mockData.submissions.filter((row) => row.studentId === DEMO_STUDENT_ID),
+    ...sessionSubmissions.filter((row) => row.studentId === DEMO_STUDENT_ID),
+  ], [sessionSubmissions])
+  // Open on the first question that is not passing yet: where the student left off.
+  const firstOpen = questions.find((question) => (
+    !allAttempts.some((row) => row.questionId === question.id && row.status === 'passed')
+  )) ?? questions[0]
+  const [questionPick, setQuestionPick] = useState<{ id: string; labId: string } | null>(null)
+  const activeQuestion = (questionPick && questionPick.labId === labId
+    ? questions.find((question) => question.id === questionPick.id)
+    : null) ?? firstOpen
+  const selectQuestion = useCallback(
+    (id: string) => setQuestionPick({ id, labId: labId ?? '' }),
+    [labId],
   )
   const p: Problem = useMemo(
-    () => (activeLab ? registerLabProblem(activeLab) : baseProblem),
-    [activeLab, baseProblem],
+    () => (activeLab && activeQuestion ? registerQuestionProblem(activeQuestion, activeLab) : problems[PROBLEM]),
+    [activeLab, activeQuestion],
   )
-  const workspaceKey = `${p.id}:${p.starter}`
+  const workspaceKey = p.id
   const activeManuals = activeLab ? manuals.filter((manual) => activeLab.manualIds.includes(manual.id)) : []
   const activePolicy = activeLab
     ? policies.find((policy) => policy.labId === activeLab.id) ?? currentPolicy
@@ -83,24 +94,42 @@ export default function StudentIde() {
   const [openManual, setOpenManual] = useState<ManualMeta | null>(null)
   const [submitState, setSubmitState] = useKeyedState<'idle' | 'saved'>(workspaceKey, 'idle')
   const startedAt = useRef<{ key: string; value: number } | null>(null)
-  const attempts = useMemo(() => {
-    if (!activeLab) return []
-    return [
-      ...mockData.submissions.filter((row) => row.studentId === DEMO_STUDENT_ID && row.labId === activeLab.id),
-      ...sessionSubmissions.filter((row) => row.labId === activeLab.id),
-    ].sort((a, b) => a.timestamp.localeCompare(b.timestamp))
-  }, [activeLab, sessionSubmissions])
-  const labAttemptCounts = useMemo(() => {
-    const counts: Record<string, number> = {}
-    for (const lab of assignedLabs) counts[lab.id] = 0
-    for (const row of mockData.submissions) {
-      if (row.studentId === DEMO_STUDENT_ID && row.labId in counts) counts[row.labId] += 1
-    }
-    for (const row of sessionSubmissions) {
-      if (row.studentId === DEMO_STUDENT_ID && row.labId in counts) counts[row.labId] += 1
-    }
-    return counts
-  }, [assignedLabs, sessionSubmissions])
+  const labAttempts = useMemo(
+    () => allAttempts.filter((row) => row.labId === activeLab?.id).sort((a, b) => a.timestamp.localeCompare(b.timestamp)),
+    [allAttempts, activeLab],
+  )
+  const attempts = useMemo(
+    () => labAttempts.filter((row) => row.questionId === activeQuestion?.id),
+    [labAttempts, activeQuestion],
+  )
+  // The conversation for this question: seeded history plus anything said in this
+  // browser, in order. It is never cleared — switching question loads its own.
+  const questionChat = useMemo(() => {
+    if (!activeQuestion) return [] as ChatTurn[]
+    return [...mockData.chats, ...sessionChat]
+      .filter((turn) => turn.studentId === DEMO_STUDENT_ID && turn.questionId === activeQuestion.id)
+      .sort((a, b) => a.at.localeCompare(b.at))
+  }, [activeQuestion, sessionChat])
+  const storedCards = useMemo<HintCard[]>(() => {
+    const cardsFromChat: HintCard[] = []
+    let pendingQuestion: string | undefined
+    questionChat.forEach((turn, index) => {
+      if (turn.role === 'student') { pendingQuestion = turn.text; return }
+      cardsFromChat.push({
+        id: -(index + 1),
+        trigger: 'requested',
+        level: (turn.level ?? 0) as Level,
+        text: turn.text,
+        pseudocode: turn.pseudocode,
+        question: pendingQuestion,
+        source: turn.source,
+        guardrail: { leaked: false, stripped: Boolean(turn.blocked), blocked: turn.blocked },
+      })
+      pendingQuestion = undefined
+    })
+    return cardsFromChat
+  }, [questionChat])
+
   const [mode, setMode] = useState<'scaffold' | 'baseline'>(INITIAL_MODE)
   const [code, setCode] = useKeyedState(workspaceKey, p.starter)
   const [cursor, setCursor] = useState({ ln: 1, col: 1 })
@@ -110,7 +139,9 @@ export default function StudentIde() {
   const [tab, setTab] = useState<'diagnostics' | 'tests'>('diagnostics')
   const [run, setRun] = useKeyedState<RunResult | null>(workspaceKey, null)
   const [explanations, setExplanations] = useState<Record<string, string>>({})
-  const [cards, setCards] = useKeyedState<HintCard[]>(workspaceKey, EMPTY_HINT_CARDS)
+  const [cards, setCards] = useKeyedState<HintCard[]>(workspaceKey, storedCards)
+  const [demoStage, setDemoStage] = useKeyedState<DemoStage>(workspaceKey, 'empty')
+  const [draft, setDraft] = useKeyedState(workspaceKey, '')
   const [thinking, setThinking] = useState(false)
   const [highlight, setHighlight] = useKeyedState<{ lines: number[]; message: string } | null>(workspaceKey, null)
   const [failedRuns, setFailedRuns] = useState(0)
@@ -142,6 +173,16 @@ export default function StudentIde() {
       return [{ id: kc.id, label: kc.name, value: point.value, low: point.uncertaintyLow, high: point.uncertaintyHigh }]
     })
   }, [activeLab])
+  // The instructor pushing a lab moves the student's screen to it.
+  const pushedLabId = currentLab?.id ?? ''
+  const pushedRef = useRef(pushedLabId)
+  useEffect(() => {
+    if (pushedLabId && pushedLabId !== pushedRef.current) {
+      pushedRef.current = pushedLabId
+      navigate(`/student/${pushedLabId}`)
+    }
+  }, [pushedLabId, navigate])
+
   const telemetry = useRef<TelemetryEvent[]>([])
   const nextId = useRef(1)
 
@@ -192,6 +233,7 @@ export default function StudentIde() {
     submitAttempt({
       studentId: DEMO_STUDENT_ID,
       labId: activeLab.id,
+      questionId: p.id,
       code,
       compileOk: !result.diagnostics.some((d) => d.severity === 'error'),
       testsPassed: passed,
@@ -240,6 +282,7 @@ export default function StudentIde() {
       logHint({
         studentId: DEMO_STUDENT_ID,
         labId: activeLab.id,
+        questionId: p.id,
         level: res.level,
         blocked,
         similarity: res.guardrail?.similarity ?? 0,
@@ -250,10 +293,26 @@ export default function StudentIde() {
         withheldText: blocked ? 'A code-shaped answer with the missing step was withheld.' : undefined,
       })
     }
+    if (activeLab) {
+      if (question) {
+        appendChat({ studentId: DEMO_STUDENT_ID, labId: activeLab.id, questionId: p.id, role: 'student', text: question })
+      }
+      appendChat({
+        studentId: DEMO_STUDENT_ID,
+        labId: activeLab.id,
+        questionId: p.id,
+        role: 'tutor',
+        text: res.text,
+        pseudocode: res.pseudocode,
+        level: res.level,
+        blocked: Boolean(res.guardrail?.blocked),
+        source: mode === 'baseline' ? 'baseline' : 'scaffold',
+      })
+    }
     if (res.highlightLines) setHighlight({ lines: res.highlightLines, message: res.text })
     setLastHintAt(Date.now())
     setActivitySinceHint(false)
-  }, [code, mastery, struggle, p, log, logHint, activeLab, promptVariant, systemPrompt, model, context, profile, maxHintLevel, mode, provider, similarityThreshold, setCards, setHighlight])
+  }, [code, mastery, struggle, p, log, logHint, appendChat, activeLab, promptVariant, systemPrompt, model, context, profile, maxHintLevel, mode, provider, similarityThreshold, setCards, setHighlight])
 
   const policyLevel = useCallback((): Level => {
     const level = cards.length ? currentLevel : failedRuns >= 3 ? 1 : 0
@@ -326,8 +385,23 @@ export default function StudentIde() {
     setCursor({ ln: line, col })
   }
 
+  // DEMO ONLY: jump the editor to a known state, or drop a plausible question into
+  // the tutor box. Neither exists in the product.
+  const fillDemo = useCallback((stage: DemoStage) => {
+    if (!activeQuestion) return
+    const next = stage === 'empty' ? activeQuestion.starter : activeQuestion.demo.code[stage]
+    setCode(next)
+    setDemoStage(stage)
+    setRun(null)
+    setHighlight(null)
+    setActivitySinceHint(true)
+    notify(stage === 'empty' ? 'Editor reset to the starter code' : `Editor filled with the ${stage} state (demo only)`)
+  }, [activeQuestion, setCode, setDemoStage, setRun, setHighlight])
+
+  if (!activeLab || !activeQuestion) return <Navigate to="/student" replace />
+
   const style = {
-    '--problem-w': problemOpen ? '22%' : '32px',
+    '--problem-w': problemOpen ? '23%' : '32px',
     '--tutor-w': tutorOpen ? '28%' : '0px',
     '--output-h': outputOpen ? '220px' : '0px',
   } as React.CSSProperties
@@ -353,13 +427,18 @@ export default function StudentIde() {
           policy={mode === 'scaffold' ? activePolicy : null}
           mastery={mode === 'scaffold' ? masteryBars : []}
           recording={mode === 'scaffold'}
-          labs={assignedLabs}
-          selectedLabId={selectedLabId}
-          onSelectLab={selectLab}
+          lab={activeLab}
+          questions={questions}
+          activeQuestionId={activeQuestion.id}
+          onSelectQuestion={selectQuestion}
+          questionAttempts={labAttempts}
           attempts={attempts}
-          labAttemptCounts={labAttemptCounts}
           onOpenManual={setOpenManual}
-          closed={activeLab?.status === 'closed'}
+          closed={activeLab.status === 'closed'}
+          demoQuestion={activeQuestion}
+          demoStage={demoStage}
+          onDemoFill={fillDemo}
+          onDemoAsk={(text) => { setDraft(text); setTutorOpen(true) }}
         />
         <div className="center">
           <CodeEditor
@@ -369,6 +448,7 @@ export default function StudentIde() {
             highlight={highlight}
             actions={actions}
             lite={LITE}
+            path={`${p.id}.cpp`}
           />
           {outputOpen && run && (
             <OutputPanel
@@ -391,6 +471,9 @@ export default function StudentIde() {
           <TutorPanel
             mode={mode}
             onMode={setMode}
+            questionLabel={`Q${activeQuestion.number} · ${activeQuestion.title}`}
+            draft={draft}
+            onDraft={setDraft}
             maxHintLevel={maxHintLevel}
             similarityThreshold={similarityThreshold}
             lite={LITE}

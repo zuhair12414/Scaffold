@@ -2,7 +2,7 @@ import { useEffect, useMemo, useReducer, type ReactNode } from 'react'
 import { CourseContext, type CourseContextValue, type NewSubmissionInput } from './CourseContext'
 import { mockData } from '../mock/data'
 import { clearDemoStorage } from './demo'
-import type { HintAuditEvent, Lab, LabPolicy, ManualMeta, Submission, SubmissionStatus } from '../types'
+import type { ChatTurn, HintAuditEvent, Lab, LabPolicy, ManualMeta, Submission, SubmissionStatus } from '../types'
 
 type SavedCourseState = {
   labs: Lab[]
@@ -15,6 +15,9 @@ type SavedCourseState = {
   // Assistance requests made from the student view in this browser, so the
   // instructor's Hint Audit shows the decision the student actually saw.
   hints: HintAuditEvent[]
+  // The conversation is kept, never deleted: a student can reread what they were
+  // told, and the instructor reads the same thing beside the attempt.
+  chat: ChatTurn[]
   statusOverrides: Record<string, Lab['status']>
   hiddenLabIds: string[]
 }
@@ -33,6 +36,7 @@ type Action =
   | { type: 'delete_lab'; labId: string }
   | { type: 'submit_attempt'; submission: Submission }
   | { type: 'log_hint'; event: HintAuditEvent }
+  | { type: 'append_chat'; turn: ChatTurn }
   | { type: 'reset' }
 
 const STORAGE_KEY = 'scaffold:course-state'
@@ -52,6 +56,7 @@ function savedSeed(): SavedCourseState {
     currentLabId: '',
     submissions: [],
     hints: [],
+    chat: [],
     statusOverrides: {},
     hiddenLabIds: [],
   }
@@ -69,6 +74,7 @@ function loadSavedState(): SavedCourseState {
       currentLabId: parsed.currentLabId ?? savedSeed().currentLabId,
       submissions: parsed.submissions ?? [],
       hints: parsed.hints ?? [],
+      chat: parsed.chat ?? [],
       statusOverrides: parsed.statusOverrides ?? {},
       hiddenLabIds: parsed.hiddenLabIds ?? [],
     }
@@ -155,6 +161,9 @@ function reducer(state: CourseState, action: Action): CourseState {
   if (action.type === 'log_hint') {
     return { ...state, hints: [...state.hints, action.event] }
   }
+  if (action.type === 'append_chat') {
+    return { ...state, chat: [...state.chat, action.turn] }
+  }
   if (action.type === 'reset') {
     return { ...savedSeed(), manualFiles: {} }
   }
@@ -169,6 +178,7 @@ function savedPart(state: CourseState): SavedCourseState {
     currentLabId: state.currentLabId,
     submissions: state.submissions,
     hints: state.hints,
+    chat: state.chat,
     statusOverrides: state.statusOverrides,
     hiddenLabIds: state.hiddenLabIds,
   }
@@ -205,6 +215,7 @@ export function CourseProvider({ children }: { children: ReactNode }) {
     policies,
     sessionSubmissions: state.submissions ?? [],
     sessionHints: state.hints ?? [],
+    sessionChat: state.chat ?? [],
     currentLab,
     currentPolicy,
     createLab: (lab) => {
@@ -247,6 +258,7 @@ export function CourseProvider({ children }: { children: ReactNode }) {
         id: `session-${Date.now()}`,
         studentId: input.studentId,
         labId: input.labId,
+        questionId: input.questionId,
         timestamp: new Date().toISOString(),
         code: input.code,
         compileOk: input.compileOk,
@@ -258,6 +270,10 @@ export function CourseProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'submit_attempt', submission })
       return submission
     },
+    appendChat: (turn) => dispatch({
+      type: 'append_chat',
+      turn: { ...turn, id: `chat-${Date.now()}-${Math.round(Math.random() * 1e6)}`, at: new Date().toISOString() },
+    }),
     logHint: (event) => dispatch({
       type: 'log_hint',
       event: { ...event, id: `session-hint-${Date.now()}`, timestamp: new Date().toISOString() },
@@ -266,7 +282,7 @@ export function CourseProvider({ children }: { children: ReactNode }) {
       clearDemoStorage()
       dispatch({ type: 'reset' })
     },
-  }), [currentLab, currentPolicy, labs, manuals, policies, state.manualFiles, state.submissions, state.hints])
+  }), [currentLab, currentPolicy, labs, manuals, policies, state.manualFiles, state.submissions, state.hints, state.chat])
 
   return <CourseContext.Provider value={value}>{children}</CourseContext.Provider>
 }

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import StudentIde from './StudentIde'
+import { LabChooser } from './student/LabChooser'
 import { ToastHost } from './components/ToastHost'
 import { Concepts } from './instructor/Concepts'
 import { HintAudit } from './instructor/HintAudit'
@@ -114,7 +115,8 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/student" replace />} />
           <Route element={<RoleShell />}>
-            <Route path="/student/*" element={<StudentIde />} />
+            <Route path="/student" element={<LabChooser />} />
+            <Route path="/student/:labId" element={<StudentIde />} />
             <Route path="/instructor" element={<Navigate to="/instructor/overview" replace />} />
             <Route path="/instructor/overview" element={<InstructorOverview />} />
             <Route path="/instructor/roster" element={<Roster />} />

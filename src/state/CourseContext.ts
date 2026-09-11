@@ -1,5 +1,5 @@
 import { createContext } from 'react'
-import type { HintAuditEvent, Lab, LabPolicy, ManualMeta, Submission } from '../types'
+import type { ChatTurn, HintAuditEvent, Lab, LabPolicy, ManualMeta, Submission } from '../types'
 
 export type NewLabInput = {
   title: string
@@ -17,6 +17,7 @@ export type NewManualInput = {
 export type NewSubmissionInput = {
   studentId: string
   labId: string
+  questionId: string
   code: string
   compileOk: boolean
   testsPassed: number
@@ -31,6 +32,7 @@ export type CourseContextValue = {
   policies: LabPolicy[]
   sessionSubmissions: Submission[]
   sessionHints: HintAuditEvent[]
+  sessionChat: ChatTurn[]
   currentLab: Lab | null
   currentPolicy: LabPolicy | null
   createLab: (lab: NewLabInput) => Lab
@@ -42,6 +44,7 @@ export type CourseContextValue = {
   deleteLab: (labId: string) => void
   submitAttempt: (input: NewSubmissionInput) => Submission
   logHint: (event: Omit<HintAuditEvent, 'id' | 'timestamp'>) => void
+  appendChat: (turn: Omit<ChatTurn, 'id' | 'at'>) => void
   resetCourse: () => void
 }
 

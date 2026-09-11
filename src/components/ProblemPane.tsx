@@ -1,6 +1,10 @@
+import { Link } from 'react-router-dom'
+import { DemoPanel } from './DemoPanel'
 import { Markdown } from './Markdown'
 import { MasteryBars, type MasteryBarItem } from './MasteryBars'
+import { QuestionList } from './QuestionList'
 import type { Problem } from '../data/problems'
+import type { DemoStage, LabQuestion } from '../mock/labQuestions'
 import type { Lab, LabPolicy, ManualMeta, Submission } from '../types'
 
 function when(iso: string) {
@@ -15,104 +19,78 @@ const OUTCOME: Record<Submission['status'], string> = {
   compile_issue: 'did not compile',
 }
 
-export function ProblemPane({
-  p,
-  collapsed,
-  lite = false,
-  manuals = [],
-  policy = null,
-  mastery = [],
-  recording = false,
-  labs = [],
-  selectedLabId = '',
-  onSelectLab,
-  attempts = [],
-  labAttemptCounts = {},
-  onOpenManual,
-  closed = false,
-}: {
+type Props = {
   p: Problem
   collapsed: boolean
   lite?: boolean
+  lab: Lab
+  questions: LabQuestion[]
+  activeQuestionId: string
+  onSelectQuestion: (questionId: string) => void
+  questionAttempts: Submission[]
+  attempts: Submission[]
   manuals?: ManualMeta[]
   policy?: LabPolicy | null
   mastery?: MasteryBarItem[]
   recording?: boolean
-  labs?: Lab[]
-  selectedLabId?: string
-  onSelectLab?: (labId: string) => void
-  attempts?: Submission[]
-  labAttemptCounts?: Record<string, number>
   onOpenManual?: (manual: ManualMeta) => void
   closed?: boolean
-}) {
+  demoQuestion: LabQuestion
+  demoStage: DemoStage
+  onDemoFill: (stage: DemoStage) => void
+  onDemoAsk: (text: string) => void
+}
+
+export function ProblemPane({
+  p,
+  collapsed,
+  lite = false,
+  lab,
+  questions,
+  activeQuestionId,
+  onSelectQuestion,
+  questionAttempts,
+  attempts,
+  manuals = [],
+  policy = null,
+  mastery = [],
+  recording = false,
+  onOpenManual,
+  closed = false,
+  demoQuestion,
+  demoStage,
+  onDemoFill,
+  onDemoAsk,
+}: Props) {
   const best = attempts.reduce((top, attempt) => Math.max(top, attempt.testsPassed), 0)
   const minutes = attempts.reduce((sum, attempt) => sum + attempt.timeOnTaskMin, 0)
-  const selectedLab = labs.find((lab) => lab.id === selectedLabId) ?? null
 
   return (
     <aside className={'pane problem' + (collapsed ? ' collapsed' : '')} aria-label="Problem">
       <div className="rail">{p.lab} · {p.title}</div>
-      {onSelectLab && labs.length > 0 && (
-        <div className="task-picker" data-testid="student-task-picker">
-          <label className="lab-picker">
-            <span className="sec">Instructor lab tasks</span>
-            <select
-              className="sel"
-              value={selectedLabId}
-              onChange={(event) => onSelectLab(event.target.value)}
-              data-testid="student-lab-picker"
-            >
-              <option value="">Practice: {p.id === 'P02' ? 'Factorial, recursively' : 'built-in problem'}</option>
-              {labs.map((lab) => (
-                <option key={lab.id} value={lab.id}>
-                  Lab {lab.number}: {lab.title}{lab.status === 'closed' ? ' (closed)' : ''}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="task-list" aria-label="Available lab tasks">
-            {labs.map((lab) => {
-              const selected = lab.id === selectedLabId
-              const attemptsForLab = labAttemptCounts[lab.id] ?? 0
-              return (
-                <button
-                  key={lab.id}
-                  type="button"
-                  className={'task-row' + (selected ? ' selected' : '')}
-                  onClick={() => onSelectLab(lab.id)}
-                  aria-current={selected ? 'true' : undefined}
-                  data-testid={`open-lab-${lab.id}`}
-                >
-                  <span>
-                    <strong>Lab {lab.number}</strong>
-                    <em>{lab.title}</em>
-                  </span>
-                  <small>
-                    {lab.status === 'closed' ? 'Closed' : 'Open'}
-                    {attemptsForLab > 0 ? ` · ${attemptsForLab} submitted` : ''}
-                    {lab.id.startsWith('local-lab-') ? ' · this session' : ''}
-                  </small>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      )}
-      {selectedLab && (
-        <div className="active-task-strip" data-testid="active-task-strip">
-          <span>Current task</span>
-          <strong>Lab {selectedLab.number}: {selectedLab.title}</strong>
-        </div>
-      )}
-      <h1>{p.title}</h1>
+
+      <div className="pane-lab-head">
+        <Link to="/student" className="back-link">All labs</Link>
+        <h2>Lab {lab.number}: {lab.title}</h2>
+      </div>
+
+      <QuestionList
+        questions={questions}
+        activeId={activeQuestionId}
+        attempts={questionAttempts}
+        onSelect={onSelectQuestion}
+      />
+
       {closed && (
         <p className="closed-note" data-testid="closed-note">
           This lab is closed. You can still read it and ask for hints; new attempts are no longer
           collected.
         </p>
       )}
+
+      <h1>{p.title}</h1>
       <Markdown text={p.statement} />
+
       {manuals.length > 0 && (
         <>
           <div className="sec">Reference material</div>
@@ -127,20 +105,26 @@ export function ProblemPane({
           </ul>
         </>
       )}
+
       {policy && policy.maxHintLevel < 4 && (
         <>
           <div className="sec">Hint policy</div>
           <p className="hint-policy-note">Your instructor capped hints at Level {policy.maxHintLevel} for this lab</p>
         </>
       )}
+
       {p.examples.length > 0 && (
         <>
           <div className="sec">Examples</div>
           {p.examples.map((e) => <div className="ex" key={e}>{e}</div>)}
         </>
       )}
+
       <div className="sec">Constraints</div>
       <ul>{p.constraints.map((c) => <li key={c}>{c}</li>)}</ul>
+
+      <DemoPanel question={demoQuestion} stage={demoStage} onFill={onDemoFill} onAsk={onDemoAsk} />
+
       {mastery.length > 0 && (
         <div className="concepts">
           <div className="sec">Your concepts</div>
@@ -151,20 +135,24 @@ export function ProblemPane({
           </p>
         </div>
       )}
-      {!lite && mastery.length === 0 && <div className="concepts">
-        <div className="sec">Concepts here</div>
-        {p.concepts.map((c) => (
-          <div className="row" key={c.name}>
-            <span>{c.name}</span>
-            <div className="segs" aria-label={`${c.name} mastery`}>
-              {[0, 1, 2, 3].map((i) => <i key={i} className={c.mastery > i / 4 + 0.05 ? 'on' : ''} />)}
+
+      {!lite && mastery.length === 0 && (
+        <div className="concepts">
+          <div className="sec">Concepts here</div>
+          {p.concepts.map((c) => (
+            <div className="row" key={c.name}>
+              <span>{c.name}</span>
+              <div className="segs" aria-label={`${c.name} mastery`}>
+                {[0, 1, 2, 3].map((i) => <i key={i} className={c.mastery > i / 4 + 0.05 ? 'on' : ''} />)}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>}
+          ))}
+        </div>
+      )}
+
       {attempts.length > 0 && (
         <div className="attempts" data-testid="student-attempts">
-          <div className="sec">Your attempts</div>
+          <div className="sec">Your attempts on this question</div>
           <p className="attempt-summary">
             {attempts.length} submitted · best {best} of {attempts[0].testsPassed + attempts[0].testsFailed} tests · {minutes} min on task
           </p>
@@ -179,10 +167,11 @@ export function ProblemPane({
           </ul>
         </div>
       )}
+
       {recording && (
         <details className="telemetry-note" data-testid="telemetry-note">
           <summary>This session is being recorded for your progress estimate</summary>
-          <p>What is collected while you work on this lab:</p>
+          <p>What is collected while you work on this question:</p>
           <ul>
             <li>edit bursts and idle gaps, as timings only</li>
             <li>each compile and test run, with the result</li>
