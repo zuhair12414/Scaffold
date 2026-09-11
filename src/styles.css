@@ -1464,7 +1464,9 @@ kbd { font: 11px/1 var(--font-ui); color: var(--muted); border: 0.5px solid var(
   color: var(--accent);
 }
 .data-body {
-  min-width: max-content;
+  /* Rows size to the table, not to their widest cell: an expanded panel must not
+     drag the whole table into a horizontal scroll. */
+  min-width: 100%;
 }
 .data-row {
   width: 100%;
@@ -2290,4 +2292,482 @@ kbd { font: 11px/1 var(--font-ui); color: var(--muted); border: 0.5px solid var(
 }
 .mastery-chart svg {
   max-height: none;
+}
+
+/* student: lab chooser */
+.chooser-page {
+  width: min(1180px, 100%);
+  padding: 28px 32px 36px;
+  overflow: auto;
+}
+.role-shell[data-role="student"] .role-main {
+  overflow: auto;
+}
+.chooser-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+}
+.chooser-card {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--raised);
+  color: var(--text);
+  text-align: left;
+  transition: border-color var(--dur), background var(--dur);
+}
+.chooser-card:hover {
+  border-color: var(--accent);
+  background: var(--tint);
+}
+.chooser-card.is-current {
+  border-color: var(--accent);
+}
+.chooser-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.chooser-number {
+  color: var(--accent);
+  font-size: var(--fs-label);
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+.chooser-card h2 {
+  margin: 0;
+  font-size: var(--fs-h2);
+  font-weight: 500;
+}
+.chooser-card > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-small);
+  line-height: 1.55;
+}
+.chooser-questions {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.chooser-questions li {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 8px;
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+.chooser-questions span {
+  color: var(--faint);
+  font-weight: 600;
+}
+.chooser-card footer {
+  display: grid;
+  gap: 6px;
+  margin-top: 2px;
+}
+.chooser-progress {
+  display: block;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--base);
+}
+.chooser-progress i {
+  display: block;
+  height: 100%;
+  background: var(--pass);
+}
+.chooser-card small {
+  color: var(--faint);
+  font-size: var(--fs-label);
+}
+
+/* student: question accordion in the problem pane */
+.pane-lab-head {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.pane-lab-head .back-link {
+  min-height: 0;
+  margin: 0;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 500;
+  text-decoration: none;
+}
+.pane-lab-head .back-link::before {
+  content: "← ";
+}
+.pane-lab-head .back-link:hover {
+  color: var(--accent);
+}
+.pane-lab-head h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+}
+.question-list {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+.question-head {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 2px 8px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 0.5px solid var(--border);
+  border-radius: 6px;
+  background: var(--raised);
+  color: var(--muted);
+  text-align: left;
+  transition: background var(--dur), border-color var(--dur), color var(--dur);
+}
+.question-head:hover {
+  color: var(--text);
+  background: var(--tint);
+}
+.question-list li.is-open .question-head {
+  border-color: var(--accent);
+  background: var(--tint);
+  color: var(--text);
+}
+.question-number {
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 600;
+}
+.question-list li.is-open .question-number {
+  color: var(--accent);
+}
+.question-title {
+  font-size: 12px;
+}
+.question-state {
+  grid-column: 2;
+  font-size: 10.5px;
+  font-style: normal;
+  color: var(--faint);
+}
+.question-state.is-pass {
+  color: var(--pass);
+}
+.question-state.is-review {
+  color: var(--warn);
+}
+
+/* student: demo-only controls, marked as such */
+.demo-panel {
+  margin: 18px 0 4px;
+  padding: 10px 11px;
+  border: 1px dashed var(--warn);
+  border-radius: 8px;
+  background: var(--raised);
+}
+.demo-panel header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.demo-panel strong {
+  color: var(--warn);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+.demo-panel em {
+  color: var(--faint);
+  font-size: 10.5px;
+  font-style: normal;
+}
+.demo-panel p {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.demo-fills,
+.demo-queries {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+.demo-fills button {
+  padding: 3px 8px;
+  border: 0.5px solid var(--border-strong);
+  border-radius: 5px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.demo-fills button:hover {
+  color: var(--text);
+  border-color: var(--warn);
+}
+.demo-fills button.on {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+.demo-queries button {
+  width: 100%;
+  padding: 6px 8px;
+  border: 0.5px solid var(--border);
+  border-radius: 5px;
+  background: var(--base);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+  text-align: left;
+}
+.demo-queries button:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.demo-panel :last-child {
+  margin-bottom: 0;
+}
+
+/* tutor: the conversation belongs to one question */
+.chat-scope {
+  margin: 0 0 4px;
+  color: var(--faint);
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+.turn-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* submissions: the verdict, its evidence, the telemetry and the conversation */
+.submission-expanded.is-wide {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 1fr);
+}
+.verdict {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--muted);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: var(--fs-small);
+  font-weight: 500;
+}
+.verdict.is-flagged {
+  border-left-color: var(--warn);
+  color: var(--warn);
+}
+.reason-list {
+  margin: 0 0 14px;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: var(--fs-small);
+  line-height: 1.6;
+}
+.reason-list li {
+  margin-bottom: 4px;
+}
+.flag-chip {
+  margin-left: 8px;
+  padding: 1px 7px;
+  border: 1px solid var(--warn);
+  border-radius: 999px;
+  color: var(--warn);
+  font-size: 10.5px;
+  font-style: normal;
+  white-space: nowrap;
+}
+.row-question {
+  margin-left: 6px;
+  color: var(--faint);
+  font-size: 11px;
+  font-style: normal;
+}
+.compare-bars {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.compare-bars > div {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) 60px;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--fs-small);
+}
+.compare-bars span {
+  color: var(--muted);
+}
+.compare-bars i {
+  display: block;
+  height: 10px;
+  min-width: 2px;
+  border-radius: 999px;
+  background: var(--accent);
+  opacity: 0.6;
+}
+.compare-bars i.is-flagged {
+  background: var(--warn);
+  opacity: 0.9;
+}
+.compare-bars strong {
+  color: var(--text);
+  font-weight: 500;
+  text-align: right;
+}
+.telemetry-log {
+  display: grid;
+  gap: 2px;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+}
+.telemetry-log li {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--fs-small);
+}
+.telemetry-log li:last-child {
+  border-bottom: 0;
+}
+.telemetry-log .event-dot {
+  position: static;
+  width: 10px;
+  height: 10px;
+  margin: 0;
+  border-width: 1px;
+  box-shadow: none;
+}
+.telemetry-log span {
+  color: var(--text);
+}
+.telemetry-log em {
+  color: var(--faint);
+  font-family: var(--font-code);
+  font-size: 11px;
+  font-style: normal;
+}
+.telemetry-log small {
+  grid-column: 2 / -1;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+.chat-log {
+  display: grid;
+  gap: 8px;
+  max-height: 300px;
+  margin-bottom: 14px;
+  overflow: auto;
+  padding-right: 4px;
+}
+.chat-log p {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: var(--fs-small);
+  line-height: 1.55;
+}
+.chat-log p span {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 10.5px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+.chat-student {
+  background: var(--base);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.chat-student span {
+  color: var(--faint);
+}
+.chat-tutor {
+  background: var(--tint);
+  color: var(--text);
+}
+.chat-tutor span {
+  color: var(--accent);
+}
+
+.telemetry-log li,
+.submission-expanded > div {
+  min-width: 0;
+}
+.telemetry-log small {
+  overflow-wrap: anywhere;
+}
+
+/* labs: per-question breakdown */
+.question-stats {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.question-stats li {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--base);
+}
+.question-stat-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.question-stat-head strong {
+  color: var(--text);
+  font-size: var(--fs-body);
+  font-weight: 500;
+}
+.question-stat-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+.question-stat-bar {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--raised);
+}
+.question-stat-bar i {
+  display: block;
+  height: 100%;
+  background: var(--pass);
+  opacity: 0.8;
+}
+.question-stats p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-small);
+  line-height: 1.55;
 }

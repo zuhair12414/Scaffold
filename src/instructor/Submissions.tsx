@@ -1,10 +1,13 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { dayMonthTime } from './format'
-import { hintEvents, labShort, submissionRows, submissionStats, type SubmissionRow } from './selectors'
+import {
+  chatFor, hintEvents, labShort, questionLabel, submissionRows, submissionStats,
+  telemetryFor, verifiedMasteryVerdict, type SubmissionRow,
+} from './selectors'
 import { useCourse } from '../state/useCourse'
 import { notify } from '../state/toast'
-import type { SubmissionStatus } from '../types'
+import type { ChatTurn, SubmissionStatus } from '../types'
 
 type SortKey = 'student' | 'lab' | 'timestamp' | 'tests' | 'time' | 'status'
 
@@ -63,22 +66,73 @@ function download(rows: SubmissionRow[]) {
   notify(`${rows.length} rows exported to CSV`)
 }
 
-function ExpandedRow({ row }: { row: SubmissionRow }) {
+function ExpandedRow({ row, classMedian, liveChat }: { row: SubmissionRow; classMedian: number; liveChat: ChatTurn[] }) {
   const navigate = useNavigate()
+  const verdict = verifiedMasteryVerdict(row, classMedian)
+  const telemetry = telemetryFor(row.student.id, row.submission.questionId)
+  const chat = chatFor(row.student.id, row.submission.questionId, liveChat)
+  const start = telemetry.length ? new Date(telemetry[0].at).getTime() : 0
+  const offset = (at: string) => (start ? `+${Math.max(0, Math.round((new Date(at).getTime() - start) / 60_000))} min` : '')
+  const scale = Math.max(classMedian * 2, verdict.minutes, 1)
+
   return (
-    <div className="submission-expanded" data-testid="submission-expanded">
+    <div className="submission-expanded is-wide" data-testid="submission-expanded">
       <div>
+        <p className={verdict.flagged ? 'verdict is-flagged' : 'verdict'} data-testid="verdict">
+          {verdict.headline}
+        </p>
+        <ul className="reason-list">
+          {verdict.reasons.length
+            ? verdict.reasons.map((reason) => <li key={reason}>{reason}</li>)
+            : <li>Nothing on this attempt separates it from the rest of the section.</li>}
+        </ul>
+        <p className="form-label">This attempt against the section</p>
+        <div className="compare-bars">
+          <div>
+            <span>this attempt</span>
+            <i className={verdict.ratio <= 0.5 ? 'is-flagged' : undefined} style={{ width: `${(verdict.minutes / scale) * 100}%` }} />
+            <strong>{verdict.minutes} min</strong>
+          </div>
+          <div>
+            <span>class median, this lab</span>
+            <i style={{ width: `${(classMedian / scale) * 100}%` }} />
+            <strong>{classMedian} min</strong>
+          </div>
+        </div>
         <p className="form-label">Submitted code</p>
         <pre className="code-block">{row.submission.code}</pre>
       </div>
+
       <div>
-        <p className="form-label">Test run</p>
-        <ul className="fact-list">
-          <li><span>compile</span><strong>{row.submission.compileOk ? 'ok' : 'needs attention'}</strong></li>
-          <li><span>tests passed</span><strong>{row.submission.testsPassed} of {row.submission.testsPassed + row.submission.testsFailed}</strong></li>
-          <li><span>time on task</span><strong>{row.submission.timeOnTaskMin} min</strong></li>
-        </ul>
-        <p className="form-label">Assistance during this lab</p>
+        <p className="form-label">Telemetry for this attempt</p>
+        {telemetry.length ? (
+          <ol className="telemetry-log" data-testid="telemetry-log">
+            {telemetry.map((event) => (
+              <li key={event.id}>
+                <i className={`event-dot ${event.kind === 'edit_burst' ? 'edit' : event.kind === 'hint_shown' ? 'hint' : event.kind}`} aria-hidden="true" />
+                <span>{event.label}</span>
+                <em>{offset(event.at)}</em>
+                <small>{event.detail}</small>
+              </li>
+            ))}
+          </ol>
+        ) : <p className="sentence-empty">No telemetry was captured for this attempt.</p>}
+
+        <p className="form-label">Conversation on this question</p>
+        {chat.length ? (
+          <div className="chat-log" data-testid="chat-log">
+            {chat.map((turn) => (
+              <p key={turn.id} className={turn.role === 'student' ? 'chat-student' : 'chat-tutor'}>
+                <span>{turn.role === 'student'
+                  ? row.student.displayName
+                  : `Tutor${turn.level != null ? ` · Level ${turn.level}` : ''}${turn.blocked ? ' · withheld' : ''}`}</span>
+                {turn.text}
+              </p>
+            ))}
+          </div>
+        ) : <p className="sentence-empty">This student did not open the tutor on this question.</p>}
+
+        <p className="form-label">Assistance decisions</p>
         {row.hints.length ? (
           <ul className="fact-list">
             {row.hints.map((hint) => (
@@ -100,7 +154,7 @@ function ExpandedRow({ row }: { row: SubmissionRow }) {
 }
 
 export function Submissions() {
-  const { labs, sessionSubmissions, sessionHints } = useCourse()
+  const { labs, sessionSubmissions, sessionHints, sessionChat } = useCourse()
   const rows = useMemo(() => submissionRows(sessionSubmissions, labs, hintEvents(sessionHints, labs)), [labs, sessionHints, sessionSubmissions])
   const [labId, setLabId] = useState('all')
   const [status, setStatus] = useState('all')
@@ -126,6 +180,14 @@ export function Submissions() {
   }, [rows, labId, status, minTests, maxMinutes, sort])
 
   const stats = useMemo(() => submissionStats(filtered), [filtered])
+  // Compare an attempt with the section that sat the same lab, not with everyone.
+  const labMedians = useMemo(() => {
+    const byLab: Record<string, number> = {}
+    for (const lab of labs) {
+      byLab[lab.id] = submissionStats(rows.filter((row) => row.submission.labId === lab.id)).medianMinutes
+    }
+    return byLab
+  }, [rows, labs])
 
   const toggleSort = (key: SortKey) => {
     setSort((current) => (
@@ -226,15 +288,20 @@ export function Submissions() {
                   onClick={() => setOpenId((current) => (current === row.submission.id ? null : row.submission.id))}
                 >
                   <span>{row.student.displayName}</span>
-                  <span>{labShort(row.submission.labId, labs)}</span>
+                  <span>{labShort(row.submission.labId, labs)}<em className="row-question">{questionLabel(row.submission.questionId, labs).split(' · ')[0]}</em></span>
                   <span>{dayMonthTime(row.submission.timestamp)}</span>
                   <span>{row.submission.testsPassed} / {row.submission.testsPassed + row.submission.testsFailed}</span>
                   <span>{row.submission.timeOnTaskMin} min</span>
                   <span className={row.submission.status === 'passed' ? 'is-pass' : 'is-review'}>
                     {STATUS_LABEL[row.submission.status]}{row.live ? ' · this session' : ''}
+                    {verifiedMasteryVerdict(row, labMedians[row.submission.labId] ?? stats.medianMinutes).flagged && (
+                      <em className="flag-chip" data-testid="low-verified-chip">low verified mastery</em>
+                    )}
                   </span>
                 </button>
-                {openId === row.submission.id && <ExpandedRow row={row} />}
+                {openId === row.submission.id && (
+                  <ExpandedRow row={row} classMedian={labMedians[row.submission.labId] ?? stats.medianMinutes} liveChat={sessionChat} />
+                )}
               </div>
             ))}
           </div>
