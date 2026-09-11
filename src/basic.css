@@ -60,7 +60,6 @@ html[data-ui="lite"] .card .codeblk { background: #1a1a1a; border: 1px solid #44
 html[data-ui="lite"] .iconbtn { color: #9a9a9a; }
 html[data-ui="lite"] .tfoot { border-top: 1px solid var(--border); }
 html[data-ui="lite"] .tfoot .why, html[data-ui="lite"] .thinking { color: #9a9a9a; }
-html[data-ui="lite"] .tutor { grid-template-rows: 40px auto auto auto minmax(0, 1fr) auto; }
 html[data-ui="lite"] .sysbox textarea { background: #1e1e1e; border: 1px solid #666; color: #e0e0e0; }
 html[data-ui="lite"] .pill { border: 1px solid #666; color: #bdbdbd; background: #2a2a2a; }
 html[data-ui="lite"] .pill.on { color: #fff; border-color: #fff; }

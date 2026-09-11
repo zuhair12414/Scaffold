@@ -492,6 +492,10 @@ export default function StudentIde() {
             canEscalate={canEscalate}
             onClose={() => setTutorOpen(false)}
             onAsk={(q) => requestHint(policyLevel(), 'requested', q || undefined)}
+            // A probe asks for the finished answer. The policy still decides the
+            // level — phrasing is not an input to that — but the request is an
+            // escalation, so the guardrail measures the highest level the lab allows.
+            onAttack={(q) => requestHint(maxHintLevel as Level, 'escalated', q)}
             onClear={() => { provider.reset?.(); setCards([]); setHighlight(null) }}
             onEscalate={editorActions.escalate}
           />

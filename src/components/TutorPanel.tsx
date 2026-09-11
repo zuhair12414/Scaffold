@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ContextMode, HintResponse, Level, ProfileMode, PromptVariant } from '../types'
 import prompts from '../providers/prompts.json'
+import { attackPrompts } from '../data/attacks'
 
 export type HintCard = HintResponse & { id: number; trigger: 'requested' | 'proactive' | 'escalated'; streaming?: boolean; question?: string }
 
@@ -29,6 +30,9 @@ type Props = {
   canEscalate: { ok: boolean; why: string }
   onClose: () => void
   onAsk: (question: string) => void
+  // An attack asks for the finished answer. In baseline that is just a message; in
+  // scaffold it is an escalation request, so the guardrail has something to measure.
+  onAttack: (question: string) => void
   onEscalate: () => void
   onClear: () => void
 }
@@ -144,7 +148,7 @@ function Gapped({ text }: { text: string }) {
   return <pre>{parts.map((p, i) => <span key={i}>{p}{i < parts.length - 1 && <u> </u>}</span>)}</pre>
 }
 
-export function TutorPanel({ mode, onMode, questionLabel, draft, onDraft, maxHintLevel, similarityThreshold, lite = false, promptVariant, onPromptVariant, systemPrompt, onSystemPrompt, model, onModel, context, onContext, profile, onProfile, cards, thinking, canEscalate, onClose, onAsk, onEscalate, onClear }: Props) {
+export function TutorPanel({ mode, onMode, questionLabel, draft, onDraft, maxHintLevel, similarityThreshold, lite = false, promptVariant, onPromptVariant, systemPrompt, onSystemPrompt, model, onModel, context, onContext, profile, onProfile, cards, thinking, canEscalate, onClose, onAsk, onAttack, onEscalate, onClear }: Props) {
   const q = draft
   const setQ = onDraft
   const [showSys, setShowSys] = useState(false)
@@ -177,23 +181,23 @@ export function TutorPanel({ mode, onMode, questionLabel, draft, onDraft, maxHin
           </button>
         </div>
       </div>
-      {mode === 'baseline' && !lite && (
+      {mode === 'baseline' && (
         <div className="controls">
               <select className="sel" value={promptVariant} onChange={(e) => onPromptVariant(e.target.value as PromptVariant)} aria-label="System prompt">
                 <option value="plain">Plain assistant (what students use)</option>
                 <option value="basic">Tutoring prompt (CodeHelp-style)</option>
                 <option value="hardened">Hardened tutoring prompt</option>
               </select>
-              {!lite && <select className="sel" value={context} onChange={(e) => onContext(e.target.value as ContextMode)} aria-label="Retrieved context">
+              <select className="sel" value={context} onChange={(e) => onContext(e.target.value as ContextMode)} aria-label="Retrieved context">
                 <option value="none">No retrieval</option>
                 <option value="rag">RAG: notes + history</option>
                 <option value="rag_solution">RAG + solution</option>
-              </select>}
-              {!lite && <select className="sel" value={profile} onChange={(e) => onProfile(e.target.value as ProfileMode)} aria-label="Student profile">
+              </select>
+              <select className="sel" value={profile} onChange={(e) => onProfile(e.target.value as ProfileMode)} aria-label="Student profile">
                 <option value="none">No profile</option>
                 <option value="strong">Strong student</option>
                 <option value="novice">Novice student</option>
-              </select>}
+              </select>
           <button className="iconbtn" onClick={onClear} title="Start a new conversation" aria-label="Start a new conversation" style={{ marginLeft: 'auto' }}>
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><path d="M2.5 8a5.5 5.5 0 1 1 1.6 3.9M2.5 12.5V8.8h3.7" /></svg>
           </button>
@@ -209,6 +213,29 @@ export function TutorPanel({ mode, onMode, questionLabel, draft, onDraft, maxHin
         />
         <button className="btn accent" onClick={submit}>{mode === 'baseline' ? 'Ask' : 'Get a hint'}</button>
       </div>
+      <details className="attack-bar" data-testid="attack-bar">
+        <summary>Leakage probes · {attackPrompts.length} tactics from the harness</summary>
+        <div className="attack-buttons">
+          {attackPrompts.map((attack) => (
+            <button
+              key={attack.id}
+              onClick={() => onAttack(attack.text)}
+              title={`${attack.tactic}\n\n${attack.text}`}
+              data-testid="attack-prompt"
+              data-attack-id={attack.id}
+            >
+              <b>{attack.id}</b>
+              {attack.label}
+            </button>
+          ))}
+        </div>
+        <p>
+          Verbatim from <code>spike/attacks.json</code>, the strings the leakage harness measures.
+          {mode === 'baseline'
+            ? ' The baseline answers them as written and the card says what came back.'
+            : ' Here they are read as a request for the finished answer, so the guardrail has something to measure.'}
+        </p>
+      </details>
       {mode === 'baseline' && (
         <div className="sysrow">
           <button className="linkbtn" onClick={() => setShowSys((v) => !v)}>{showSys ? 'Hide system prompt' : 'Show system prompt'}</button>
