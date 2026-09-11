@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ContextMode, HintResponse, Level, ProfileMode, PromptVariant } from '../types'
+import type { HintResponse, Level, PromptVariant } from '../types'
 import prompts from '../providers/prompts.json'
 import { attackPrompts } from '../data/attacks'
 
@@ -16,15 +16,10 @@ type Props = {
   similarityThreshold: number
   lite?: boolean
   promptVariant: PromptVariant
-  onPromptVariant: (v: PromptVariant) => void
   systemPrompt: string
   onSystemPrompt: (text: string, v: PromptVariant) => void
   model: string
   onModel: (m: string) => void
-  context: ContextMode
-  onContext: (c: ContextMode) => void
-  profile: ProfileMode
-  onProfile: (p: ProfileMode) => void
   cards: HintCard[]
   thinking: boolean
   canEscalate: { ok: boolean; why: string }
@@ -132,7 +127,7 @@ function BaselineCard({ c }: { c: HintCard }) {
       <div className={'card' + (c.verdict === 'error' ? ' error' : '')}>
         <div className="meta">
           <span className="model">{c.model ?? 'assistant'}</span>
-          {c.promptVariant && <span>{c.promptVariant}{c.context && c.context !== 'none' ? ` · ${c.context}` : ''}{c.profile && c.profile !== 'none' ? ` · ${c.profile}` : ''}</span>}
+          {c.promptVariant && <span>{c.promptVariant === 'plain' ? 'baseline' : c.promptVariant}</span>}
           {c.latencyMs != null && <span className="lat">{(c.latencyMs / 1000).toFixed(1)}s</span>}
           {c.streaming ? <span className="chip">writing</span> : <span className={'chip ' + (c.verdict ?? 'clean')}>{VERDICT[c.verdict ?? 'clean']}</span>}
         </div>
@@ -148,7 +143,7 @@ function Gapped({ text }: { text: string }) {
   return <pre>{parts.map((p, i) => <span key={i}>{p}{i < parts.length - 1 && <u> </u>}</span>)}</pre>
 }
 
-export function TutorPanel({ mode, onMode, questionLabel, draft, onDraft, maxHintLevel, similarityThreshold, lite = false, promptVariant, onPromptVariant, systemPrompt, onSystemPrompt, model, onModel, context, onContext, profile, onProfile, cards, thinking, canEscalate, onClose, onAsk, onAttack, onEscalate, onClear }: Props) {
+export function TutorPanel({ mode, onMode, questionLabel, draft, onDraft, maxHintLevel, similarityThreshold, lite = false, promptVariant, systemPrompt, onSystemPrompt, model, onModel, cards, thinking, canEscalate, onClose, onAsk, onAttack, onEscalate, onClear }: Props) {
   const q = draft
   const setQ = onDraft
   const [showSys, setShowSys] = useState(false)
@@ -157,7 +152,9 @@ export function TutorPanel({ mode, onMode, questionLabel, draft, onDraft, maxHin
     if (!showSys) return
     fetch('/ollama/api/tags').then((r) => r.json()).then((d: { models?: { name: string }[] }) => setModels((d.models ?? []).map((m) => m.name))).catch(() => setModels([]))
   }, [showSys])
-  const PRESET_LABEL: Record<string, string> = { plain: 'Plain assistant', basic: 'Tutoring prompt', hardened: 'Hardened prompt' }
+  // Two prompts, because two is the comparison: what students use today, and the
+  // best a prompt can do. The middle one still exists in prompts.json for the spike.
+  const PRESET_LABEL: Record<string, string> = { plain: 'Baseline prompt', hardened: 'Hardened prompt' }
   const listRef = useRef<HTMLDivElement>(null)
   const lastLen = cards.length ? cards[cards.length - 1].text.length : 0
   useEffect(() => { listRef.current?.scrollTo({ top: listRef.current.scrollHeight }) }, [cards.length, thinking, lastLen])
@@ -181,28 +178,6 @@ export function TutorPanel({ mode, onMode, questionLabel, draft, onDraft, maxHin
           </button>
         </div>
       </div>
-      {mode === 'baseline' && (
-        <div className="controls">
-              <select className="sel" value={promptVariant} onChange={(e) => onPromptVariant(e.target.value as PromptVariant)} aria-label="System prompt">
-                <option value="plain">Plain assistant (what students use)</option>
-                <option value="basic">Tutoring prompt (CodeHelp-style)</option>
-                <option value="hardened">Hardened tutoring prompt</option>
-              </select>
-              <select className="sel" value={context} onChange={(e) => onContext(e.target.value as ContextMode)} aria-label="Retrieved context">
-                <option value="none">No retrieval</option>
-                <option value="rag">RAG: notes + history</option>
-                <option value="rag_solution">RAG + solution</option>
-              </select>
-              <select className="sel" value={profile} onChange={(e) => onProfile(e.target.value as ProfileMode)} aria-label="Student profile">
-                <option value="none">No profile</option>
-                <option value="strong">Strong student</option>
-                <option value="novice">Novice student</option>
-              </select>
-          <button className="iconbtn" onClick={onClear} title="Start a new conversation" aria-label="Start a new conversation" style={{ marginLeft: 'auto' }}>
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><path d="M2.5 8a5.5 5.5 0 1 1 1.6 3.9M2.5 12.5V8.8h3.7" /></svg>
-          </button>
-        </div>
-      )}
       <div className="ask">
         <input
           value={q}
@@ -239,7 +214,7 @@ export function TutorPanel({ mode, onMode, questionLabel, draft, onDraft, maxHin
       {mode === 'baseline' && (
         <div className="sysrow">
           <button className="linkbtn" onClick={() => setShowSys((v) => !v)}>{showSys ? 'Hide system prompt' : 'Show system prompt'}</button>
-          <span className="sysusing">using: {promptVariant}</span>
+          <span className="sysusing">using: {promptVariant === 'plain' ? 'baseline' : promptVariant}</span>
           <button className="linkbtn" onClick={onClear}>New conversation</button>
         </div>
       )}
@@ -252,7 +227,7 @@ export function TutorPanel({ mode, onMode, questionLabel, draft, onDraft, maxHin
             </select>
           </div>
           <div className="presets">
-            {(['plain', 'basic', 'hardened'] as const).map((v) => (
+            {(['plain', 'hardened'] as const).map((v) => (
               <button key={v} className={'pill' + (promptVariant === v ? ' on' : '')} onClick={() => onSystemPrompt(prompts[v], v)}>{PRESET_LABEL[v]}</button>
             ))}
           </div>
@@ -269,7 +244,9 @@ export function TutorPanel({ mode, onMode, questionLabel, draft, onDraft, maxHin
           <div key={c.id} className="turn-group">
             {c.question && <div className="you">{c.question}</div>}
           <div className={'card' + (c.guardrail?.blocked ? ' withheld' : '')}>
-            <Ladder level={c.level} />
+            {/* The baseline has no levels. That is the point of it, so it shows none,
+                even on a turn the scaffold tutor wrote earlier in this conversation. */}
+            {mode !== 'baseline' && <Ladder level={c.level} />}
             {c.guardrail?.blocked && (
               <p className="withheld-line" data-testid="withheld-card">
                 Level {c.level} was withheld / {c.guardrail.reason}
