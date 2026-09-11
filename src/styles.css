@@ -2771,3 +2771,230 @@ kbd { font: 11px/1 var(--font-ui); color: var(--muted); border: 0.5px solid var(
   font-size: var(--fs-small);
   line-height: 1.55;
 }
+
+/* overview: easy mode */
+.overview-heading-side {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+.overview-heading-side > p {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 600;
+}
+.overview-heading .mode-switch {
+  border-color: var(--border);
+  background: var(--base);
+}
+.overview-heading .mode-switch button {
+  min-height: 26px;
+  padding: 0 12px;
+  font-size: var(--fs-small);
+}
+.overview-grid.is-easy {
+  grid-template-areas:
+    "heatmap attention"
+    "heatmap live"
+    "detail detail";
+}
+.concept-detail {
+  grid-area: detail;
+}
+.easy-region {
+  display: grid;
+  grid-area: heatmap;
+  align-content: start;
+  gap: 14px;
+  min-width: 0;
+}
+.easy-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.72fr);
+  grid-template-areas:
+    "trend trend"
+    "concepts labs";
+  gap: 14px;
+}
+.easy-trend {
+  grid-area: trend;
+}
+.easy-concepts {
+  grid-area: concepts;
+}
+.easy-labs {
+  grid-area: labs;
+}
+.easy-grid svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 210px;
+  max-height: 280px;
+}
+.chart-caption {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: var(--fs-small);
+  line-height: 1.55;
+}
+
+/* concept strength bars */
+.concept-strength {
+  display: grid;
+  gap: 4px;
+}
+.concept-strength button {
+  display: grid;
+  grid-template-columns: minmax(120px, 1.1fr) minmax(90px, 2fr) 42px;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 7px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--muted);
+  text-align: left;
+  transition: background var(--dur), border-color var(--dur);
+}
+.concept-strength button:hover {
+  background: var(--tint);
+  color: var(--text);
+}
+.concept-strength button.is-open {
+  border-color: var(--accent);
+  background: var(--tint);
+  color: var(--text);
+}
+.concept-strength span {
+  font-size: var(--fs-small);
+}
+.concept-strength i {
+  position: relative;
+  display: block;
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--base);
+}
+.concept-strength b {
+  display: block;
+  height: 100%;
+  background: var(--warn);
+  opacity: 0.72;
+}
+.concept-strength u {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--muted);
+}
+.concept-strength strong {
+  color: var(--text);
+  font-size: var(--fs-small);
+  font-weight: 500;
+  text-align: right;
+}
+.concept-strength small {
+  grid-column: 2 / -1;
+  color: var(--faint);
+  font-size: var(--fs-label);
+}
+
+/* lab progress bars */
+.lab-progress {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.lab-progress > div {
+  display: grid;
+  grid-template-columns: 56px minmax(80px, 1fr) 44px;
+  align-items: center;
+  gap: 3px 10px;
+}
+.lab-progress span {
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+.lab-progress i {
+  display: flex;
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--base);
+}
+.lab-progress b {
+  display: block;
+  height: 100%;
+}
+.lab-progress b.is-pass {
+  background: var(--pass);
+  opacity: 0.8;
+}
+.lab-progress b.is-review {
+  background: var(--warn);
+  opacity: 0.75;
+}
+.lab-progress b.is-compile {
+  background: var(--fail);
+  opacity: 0.65;
+}
+.lab-progress strong {
+  color: var(--text);
+  font-size: var(--fs-small);
+  font-weight: 500;
+  text-align: right;
+}
+.lab-progress small {
+  grid-column: 2 / -1;
+  color: var(--faint);
+  font-size: var(--fs-label);
+}
+
+/* the concept detail, opened in place */
+.concept-detail .suggested-action {
+  margin-bottom: 14px;
+}
+.concept-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(260px, 0.9fr) minmax(210px, 0.7fr);
+  gap: 16px;
+}
+.concept-detail-grid svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 180px;
+  max-height: 250px;
+}
+.concept-detail-grid .attention-list {
+  max-height: 260px;
+  overflow: auto;
+}
+.concept-detail .form-label {
+  display: block;
+  margin: 0 0 8px;
+}
+
+@media (max-width: 1180px) {
+  .easy-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "trend"
+      "concepts"
+      "labs";
+  }
+  .concept-detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.trend-controls {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+
+.class-gap-area {
+  fill: url(#classGap);
+}

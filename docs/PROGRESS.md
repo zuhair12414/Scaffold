@@ -132,6 +132,21 @@ horizontal overflow.
   or working state and drop a stage-appropriate question into the tutor box. They
   are fenced in a dashed panel reading *not part of the product* (D22).
 
+## Overview: easy and complex (D23)
+
+The Concepts tab is gone and the nav is six items. Overview switches between:
+
+- **Easy** — class mastery over the labs (both estimates, gap shaded, with a
+  whole-section / six-to-review switch), concept strength weakest-first with the
+  threshold marked, per-lab outcome bars. Clicking a concept opens its full detail
+  in place — distribution, mean per lab, students below 0.35, suggested action.
+- **Complex** — the heatmap, unchanged.
+
+Checked: the mode persists across a reload, `?demo=1` returns it to easy while the
+screen is already mounted, `/instructor/concepts` redirects to the Overview, and
+the cohort switch moves the caption from 0.53/0.47 across the section to 0.82/0.35
+across the six under review.
+
 ## Known limits — say these out loud rather than hide them
 
 - A lab authored in the console borrows the built-in problem's hint ladder, tests

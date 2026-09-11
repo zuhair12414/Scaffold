@@ -1,7 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useSyncExternalStore } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { mockData } from '../mock/data'
 import { useCourse } from '../state/useCourse'
+import { ConceptDetail } from './ConceptDetail'
+import { OverviewEasy } from './OverviewEasy'
+import { overviewMode, setOverviewMode, subscribeOverviewMode, type OverviewMode } from '../state/demo'
 import { mastery } from './format'
 import { attentionRows, currentLab as selectCurrentLab, overviewStats, studentRows, type SelectorScope } from './selectors'
 import type { KnowledgeComponentId } from '../types'
@@ -25,7 +28,10 @@ export function InstructorOverview() {
     submissions: sessionSubmissions,
     hints: sessionHints,
   }), [labs, currentLab, sessionSubmissions, sessionHints])
+  const mode = useSyncExternalStore(subscribeOverviewMode, overviewMode, overviewMode)
+  const [openKc, setOpenKc] = useState<KnowledgeComponentId | null>(null)
   const [sortKc, setSortKc] = useState<KnowledgeComponentId>('bst-invariants')
+  const chooseMode = (next: OverviewMode) => setOverviewMode(next)
   const rows = useMemo(() => studentRows(scope), [scope])
   const stats = useMemo(() => overviewStats(scope), [scope])
   const openLab = useMemo(() => selectCurrentLab(scope), [scope])
@@ -47,7 +53,17 @@ export function InstructorOverview() {
           <p className="instructor-eyebrow">Course pulse</p>
           <h1>Instructor Overview</h1>
         </div>
-        <p>FAST NUCES Islamabad / DSA lab section / seeded frontend data</p>
+        <div className="overview-heading-side">
+          <div className="mode-switch" role="group" aria-label="Overview detail">
+            <button className={mode === 'easy' ? 'on' : undefined} onClick={() => chooseMode('easy')} data-testid="mode-easy">
+              Easy
+            </button>
+            <button className={mode === 'complex' ? 'on' : undefined} onClick={() => chooseMode('complex')} data-testid="mode-complex">
+              Complex
+            </button>
+          </div>
+          <p>FAST NUCES Islamabad / DSA lab section / seeded frontend data</p>
+        </div>
       </div>
 
       <section className="overview-stats" aria-label="Overview stats" data-testid="overview-stats">
@@ -73,7 +89,12 @@ export function InstructorOverview() {
         </div>
       </section>
 
-      <div className="overview-grid">
+      <div className={mode === 'easy' ? 'overview-grid is-easy' : 'overview-grid'}>
+        {mode === 'easy' ? (
+          <div className="heatmap-region easy-region">
+            <OverviewEasy scope={scope} selectedKc={openKc} onSelectKc={(kcId) => setOpenKc((current) => (current === kcId ? null : kcId))} />
+          </div>
+        ) : (
         <section className="overview-region heatmap-region" data-testid="overview-heatmap">
           <div className="region-title">
             <div>
@@ -115,6 +136,7 @@ export function InstructorOverview() {
             <p className="sentence-empty">The roster has not loaded any students yet.</p>
           )}
         </section>
+        )}
 
         <section className="overview-region attention-region" data-testid="overview-attention">
           <div className="region-title">
@@ -159,6 +181,8 @@ export function InstructorOverview() {
             <p className="sentence-empty">No students are active in the current lab window.</p>
           )}
         </section>
+
+        {mode === 'easy' && openKc && <ConceptDetail kcId={openKc} onClose={() => setOpenKc(null)} />}
       </div>
     </section>
   )

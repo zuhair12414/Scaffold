@@ -247,3 +247,30 @@ exposes them in a panel with a dashed border reading **Demo controls · not part
 the product**, and every fill raises a toast saying "demo only". It is declared on
 screen for the same reason the DEMO DATA badge is: a panel that finds undeclared
 help stops believing the rest.
+
+### D23 · The Overview has two modes, and Concepts is one of them
+**Why:** the class heatmap is 47 rows by 8 columns. It is the right screen for
+someone who already knows what they are looking for, and the wrong one to open a
+defence on. Meanwhile the Concepts screen held the only class-scale pictures in
+the product, one nav item away from the numbers they explain.
+**Consequence:** the Concepts tab is gone; the nav is six items. Overview carries
+an **Easy / Complex** switch:
+- **Easy** is the section and its labs as pictures — class mastery over the labs
+  with both estimates and the gap shaded, concept strength weakest-first with the
+  0.35 threshold marked, and per-lab outcome bars with median time and withheld
+  counts. Picking a concept opens the old Concepts detail in place, full width:
+  distribution, mean per lab, students below threshold, suggested action.
+- **Complex** is the heatmap exactly as it was.
+
+The attention panel and the live strip sit beside both, because "correct
+submissions, low verified mastery" is the point of the screen in either mode.
+
+The class trend carries a second switch: **whole section** or **the six to
+review**. Across 47 students the two estimates separate by about 0.06 and a
+section mean hides the effect; across the six it is 0.82 against 0.35. Both
+readings are true, and the control says which one is on screen rather than
+quietly showing the flattering one.
+
+The chosen mode persists like projector mode, and `?demo=1` returns it to easy so
+a walkthrough always starts on the same screen. `/instructor/concepts` redirects
+to the Overview rather than 404ing.
