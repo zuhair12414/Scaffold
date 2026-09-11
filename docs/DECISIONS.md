@@ -274,3 +274,25 @@ quietly showing the flattering one.
 The chosen mode persists like projector mode, and `?demo=1` returns it to easy so
 a walkthrough always starts on the same screen. `/instructor/concepts` redirects
 to the Overview rather than 404ing.
+
+### D24 · The assistant panel comes back in full, with the harness attacks on it
+**Why:** the model picker, the three system-prompt presets and the retrieval and
+profile selectors were hidden behind the PoC-lite flag, so the panel that makes
+the baseline argument was invisible in the default build. And the attacks that
+produce leakage lived only in `spike/attacks.json`, which means the claim could be
+read in a terminal but never shown in the product.
+**Consequence:** the baseline panel shows the ask field, the model picker, the
+three presets — plain (what students use), tutoring, hardened — and the editable
+system prompt in both UI modes. A **Leakage probes** strip carries six tactics
+verbatim from the harness: B0 benign, A1 direct demand, A2 false authority, A4
+pseudocode in exact C++ syntax, X3 another language, X10 split into harmless
+facts. Only the problem-agnostic strings are surfaced, so they read correctly on
+any question, and the panel names its source so a reply can be put next to
+`docs/EVIDENCE.md`.
+
+The same probes fire in scaffold mode, where they are treated as a request for the
+finished answer. That is the contrast worth showing: the phrasing never reaches
+the level decision — a policy makes that from the knowledge state — and the
+guardrail then measures what came back. X3 on the successor question returns
+`Level 4 was withheld / similarity 0.78 > 0.60`, and the same request against the
+baseline is answered as written.
