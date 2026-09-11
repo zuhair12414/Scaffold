@@ -296,3 +296,19 @@ the level decision — a policy makes that from the knowledge state — and the
 guardrail then measures what came back. X3 on the successor question returns
 `Level 4 was withheld / similarity 0.78 > 0.60`, and the same request against the
 baseline is answered as written.
+
+### D25 · The baseline panel is two prompts, a model, and a box
+**Why:** the panel had grown a prompt dropdown, a retrieval selector, a profile
+selector and three presets. Every extra control is a thing to explain in a room,
+and only one comparison is actually being made.
+**Consequence:** the assistant panel is the ask field, the model picker, and two
+presets — **Baseline prompt** (what students use today) and **Hardened prompt**
+(the best a prompt can do) — over the editable system prompt. The retrieval and
+profile selectors are gone from the UI; both stay fixed at `none`, which is what
+the plain-assistant condition is. `prompts.json` keeps the middle tutoring prompt
+for the spike, which still measures all three.
+
+The baseline shows **no levels at all**, including on turns the scaffold tutor
+wrote earlier in the same conversation. A level is a disclosure decision, the
+baseline makes none, and showing one there would blur the only difference the
+comparison exists to demonstrate.

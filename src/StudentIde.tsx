@@ -153,9 +153,10 @@ export default function StudentIde() {
   const [promptVariant, setPromptVariant] = useState<PromptVariant>(initialVariant)
   const [systemPrompt, setSystemPrompt] = useState<string>(prompts[initialVariant])
   const [model, setModel] = useState<string>(MODEL)
-  const choosePreset = (v: PromptVariant) => { setPromptVariant(v); if (v !== 'custom') setSystemPrompt(prompts[v]) }
-  const [context, setContext] = useState<ContextMode>('none')
-  const [profile, setProfile] = useState<ProfileMode>('none')
+  // No retrieval and no profile in the panel any more: the baseline is the plain
+  // assistant a student uses, and these stay off unless the spike turns them on.
+  const context: ContextMode = 'none'
+  const profile: ProfileMode = 'none'
   const [now, setNow] = useState(() => Date.now())
   const provider = useMemo<HintProvider>(
     () => (mode === 'scaffold' ? new MockHintProvider() : new OllamaBaselineProvider(model)),
@@ -478,15 +479,10 @@ export default function StudentIde() {
             similarityThreshold={similarityThreshold}
             lite={LITE}
             promptVariant={promptVariant}
-            onPromptVariant={choosePreset}
             systemPrompt={systemPrompt}
             onSystemPrompt={(text, v) => { setSystemPrompt(text); setPromptVariant(v) }}
             model={model}
             onModel={setModel}
-            context={context}
-            onContext={setContext}
-            profile={profile}
-            onProfile={setProfile}
             cards={cards}
             thinking={thinking}
             canEscalate={canEscalate}
