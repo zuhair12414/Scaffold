@@ -46,3 +46,7 @@ All rules in `AGENTS.md §4` apply. Additionally:
 4. **Every number in `docs/` must come from a command whose output is saved.**
    Run the command, save the output (CSV or markdown in `research/spike/results/`
    or equivalent), then cite it. Numbers without a saved artefact are not evidence.
+
+5. **Never rewrite or push git history.** No `filter-branch`, no rebase or amend of
+   pushed commits, no force push, and never run `git push` — a human pushes.
+   Keep every `Co-Authored-By` line; it is our disclosure record (handbook Form 13).
