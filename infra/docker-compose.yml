@@ -1,0 +1,60 @@
+services:
+  api:
+    build:
+      context: ../services/api
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - LLM_BASE_URL=${LLM_BASE_URL}
+      - LLM_MODEL=${LLM_MODEL}
+      - DATABASE_URL=postgresql://scaffold:scaffold@postgres:5432/scaffold
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - ../services/api:/app
+      - ../packages:/packages
+      - ../problems:/problems:ro
+
+  runner:
+    build:
+      context: ../services/runner
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=postgresql://scaffold:scaffold@postgres:5432/scaffold
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    environment:
+      POSTGRES_USER: scaffold
+      POSTGRES_PASSWORD: scaffold
+      POSTGRES_DB: scaffold
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scaffold"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data:
