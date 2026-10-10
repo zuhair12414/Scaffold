@@ -201,49 +201,47 @@ bool search(int value) {
   },
 
   'lab-05': {
-    examples: ['erase a leaf  =>  parent link cleared', 'erase a node with one child  =>  child takes its place', 'erase a node with two children  =>  in-order successor takes its place'],
-    constraints: ['Ordering must hold after every erase', 'Free the removed node exactly once', 'Recursive solution is fine'],
-    solution: `Node* erase(Node* root, int key) {
-    if (root == nullptr) return nullptr;
-    if (key < root->value) root->left = erase(root->left, key);
-    else if (key > root->value) root->right = erase(root->right, key);
-    else {
-        if (root->left == nullptr) { Node* right = root->right; delete root; return right; }
-        if (root->right == nullptr) { Node* left = root->left; delete root; return left; }
-        Node* successor = root->right;
-        while (successor->left != nullptr) successor = successor->left;
-        root->value = successor->value;
-        root->right = erase(root->right, successor->value);
+    examples: ['bubble sort: {5, 1, 4, 2, 8}  =>  {1, 2, 4, 5, 8}', 'selection sort: {64, 25, 12, 22, 11}  =>  {11, 12, 22, 25, 64}', 'insertion sort: {5, 2, 4, 6, 1, 3}  =>  {1, 2, 3, 4, 5, 6}'],
+    constraints: ['Sort in place', 'Ascending order', 'No STL sort', 'Explain the cost of each algorithm'],
+    solution: `void bubbleSort(int values[], int n) {
+    for (int pass = 0; pass < n - 1; pass++) {
+        for (int i = 0; i < n - pass - 1; i++) {
+            if (values[i] > values[i + 1]) {
+                int temp = values[i];
+                values[i] = values[i + 1];
+                values[i + 1] = temp;
+            }
+        }
     }
-    return root;
 }`,
     hints: {
-      0: { text: 'Three shapes of node can be deleted, and only one of them is hard. Which one leaves two subtrees that both still need a parent?' },
-      1: { text: 'The function returns root without removing anything, so the key stays in the tree. Erase has to return whatever should stand in the deleted node\'s place — sometimes that is a child, sometimes it is the node itself.', anchor: /return\s+root/ },
-      2: { text: 'A leaf is replaced by nothing, and a node with one child is replaced by that child. The two-child case cannot be replaced by either subtree, so it borrows a value that keeps the ordering: the smallest value in the right subtree. Copy that value up, then delete it from the right subtree instead.' },
-      3: { text: 'Here is the shape with the successor walk left blank.', pseudocode: 'erase(root, key):\n    if key < root.value: root.left = erase(root.left, key)\n    else if key > root.value: root.right = erase(root.right, key)\n    else:\n        if one child is missing: return the other child\n        successor = root.[__]\n        while successor.[__] is not null: successor = successor.[__]\n        root.value = successor.value\n        root.right = erase(root.right, successor.value)\n    return root' },
-      4: { text: 'The whole shape, with the successor walk left open.', pseudocode: 'Node* erase(Node* root, int key) {\n    if (key < root->value) root->left = erase(root->left, key);\n    else if (key > root->value) root->right = erase(root->right, key);\n    else {\n        if (root->left == nullptr) return root->right;\n        if (root->right == nullptr) return root->left;\n        Node* successor = root->[__];\n        while (successor->[__] != nullptr) successor = successor->[__];\n        root->value = successor->value;\n        root->right = erase(root->right, successor->value);\n    }\n    return root;\n}' },
+      0: { text: 'All three tasks sort by repeatedly comparing values already in the array. Which algorithm only swaps neighboring values?' },
+      1: { text: 'For bubble sort, look at adjacent pairs. If the left value is larger, swap the pair so the larger value moves one step toward the end.', anchor: /values\s*\[|for\s*\(/ },
+      2: { text: 'One complete bubble-sort pass compares index i with i + 1 from the start of the unsorted section to the last unsorted pair. After the pass, the largest remaining value is already in place.' },
+      3: { text: 'Here is the bubble-sort shape with the comparison left blank.', pseudocode: 'for pass from 0 to n - 2:\n    for i from 0 to n - pass - 2:\n        if values[i] [__] values[i + 1]:\n            swap values[i] and values[i + 1]' },
+      4: { text: 'The adjacent comparison and swap are missing.', pseudocode: 'if (values[i] [__] values[i + 1]) {\n    int temp = values[i];\n    values[i] = values[i + 1];\n    values[i + 1] = temp;\n}' },
     },
     tests: [
-      { name: 'erase a leaf', expected: 'ok', hidden: false },
-      { name: 'erase a node with one child', expected: 'ok', hidden: false },
-      { name: 'erase a node with two children', expected: 'ok', hidden: false },
-      { name: 'ordering holds after erase', expected: 'ok', hidden: false },
-      { name: 'hidden: erase the root', expected: 'ok', hidden: true },
-      { name: 'hidden: erase an absent key', expected: 'ok', hidden: true },
+      { name: 'sorts mixed values', expected: '{1, 2, 4, 5, 8}', hidden: false },
+      { name: 'sorts reverse order', expected: '{1, 2, 3}', hidden: false },
+      { name: 'keeps sorted input', expected: 'unchanged', hidden: false },
+      { name: 'handles one value', expected: 'unchanged', hidden: false },
+      { name: 'hidden: duplicates stay sorted', expected: 'ok', hidden: true },
+      { name: 'hidden: empty array does not crash', expected: 'ok', hidden: true },
     ],
     checks: {
-      definition: /Node\s*\*\s*erase\s*\(/,
-      definitionRaw: "undefined reference to 'erase(Node*, int)'",
-      definitionCls: 'undefined-erase',
-      key: /while\s*\(\s*\w+\s*->\s*left|successor|->\s*left\s*!=\s*nullptr/,
-      keyRaw: 'no node is ever unlinked or freed [-Wunused-parameter]',
-      keyCls: 'bst-no-erase',
+      definition: /void\s+bubbleSort\s*\(\s*int\s+\w+\s*\[\]\s*,\s*int\s+\w+\s*\)/,
+      definitionRaw: "undefined reference to 'bubbleSort(int*, int)'",
+      definitionCls: 'undefined-bubble-sort',
+      key: /for\s*\([\s\S]*for\s*\([\s\S]*if\s*\([\s\S]*(int\s+temp|swap\s*\(|std::swap)/,
+      keyRaw: 'array is scanned but adjacent values are never swapped [-Wunused-value]',
+      keyCls: 'bubble-sort-no-swap',
       keySeverity: 'warning',
-      keyAnchor: /return\s+root/,
+      keyAnchor: /for\s*\(|if\s*\(|values\s*\[/,
       explanation:
-        'The key is never removed: the function returns the tree it was given. The two-child case is the one that needs the in-order successor — the smallest value in the right subtree — copied up before it is erased from below.',
+        'Bubble sort needs repeated adjacent comparisons and a swap when two neighbors are out of order. Without the swap, the array is inspected but never rearranged.',
     },
+    kcIds: ['array-pointer-basics', 'complexity-reasoning'],
   },
 
   'lab-06': {

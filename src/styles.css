@@ -84,6 +84,9 @@ kbd { font: 11px/1 var(--font-ui); color: var(--muted); border: 0.5px solid var(
 .diag.raw-only { grid-template-columns: 1fr; }
 .diag .raw { display: flex; gap: 8px; align-items: flex-start; }
 .diag .loc { color: var(--muted); }
+.run-insight { grid-column: 1 / -1; font-family: var(--font-ui); background: color-mix(in srgb, var(--warn) 14%, transparent); border: 0.5px solid color-mix(in srgb, var(--warn) 45%, var(--border)); border-radius: 6px; padding: 8px 10px; }
+.run-insight span { display: block; color: var(--warn); font-size: 11px; margin-bottom: 4px; }
+.run-insight p { margin: 0; color: var(--text); font-size: 13px; line-height: 1.35; }
 .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-top: 6px; flex: none; }
 .dot.warn { background: var(--warn); } .dot.fail { background: var(--fail); } .dot.pass { background: var(--pass); }
 .explain { font-family: var(--font-ui); font-size: 13px; background: var(--tint); border-radius: 6px; padding: 8px 10px; }

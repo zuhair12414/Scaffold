@@ -99,12 +99,12 @@ const labsBase: Omit<Lab, 'manualIds'>[] = [
   {
     id: 'lab-05',
     number: 5,
-    title: 'BST delete',
+    title: 'Sorting lab',
     status: 'open',
     dueAt: '2026-10-14T17:00:00.000+05:00',
-    kcIds: ['bst-invariants', 'in-order-successor', 'pointer-reassignment-free'],
-    statement: 'Delete a key from a BST, including the two-children case, while preserving ordering.',
-    starterCode: 'Node* erase(Node* root, int key) {\n    return root;\n}\n',
+    kcIds: ['array-pointer-basics', 'complexity-reasoning'],
+    statement: 'Implement simple in-place sorting algorithms and explain their costs.',
+    starterCode: 'void bubbleSort(int values[], int n) {\n}\n',
   },
   {
     id: 'lab-06',
@@ -118,64 +118,57 @@ const labsBase: Omit<Lab, 'manualIds'>[] = [
   },
 ]
 
-const BST_REFERENCE = `# Deleting from a binary search tree
+const SORTING_REFERENCE = `# Simple sorting algorithms
 
 Course reference, CS2 Data Structures. Attached to Lab 5 by the instructor.
 
-## The three shapes
+## Bubble sort
 
-A node you are asked to remove is one of three shapes, and only the third is hard.
+Bubble sort compares adjacent values and swaps them when they are out of order.
+After one full pass, the largest unsorted value has moved to the end of the
+array. Each next pass can stop one position earlier.
 
-- **A leaf.** Nothing depends on it. The parent link becomes null.
-- **One child.** The child takes the node's place. The ordering still holds,
-  because everything in that subtree was already on the correct side.
-- **Two children.** Neither child can take the place directly: whichever you
-  choose, the other subtree has nowhere to hang.
+## Selection sort
 
-## Why the successor
+Selection sort treats the left side as sorted. For each position, scan the
+unsorted suffix, remember the index of the smallest value, and swap that value
+into the current position.
 
-For the two-child case you need a value that is larger than everything in the
-left subtree and smaller than everything in the right subtree. Exactly two values
-qualify: the largest value in the left subtree, and the smallest in the right.
-The smallest in the right subtree is the **in-order successor**, and it is found
-by taking one step right and then walking left until you cannot.
+## Insertion sort
 
-That node has at most one child, by construction — nothing is smaller than it in
-that subtree — so removing it is one of the two easy cases.
+Insertion sort keeps a sorted prefix. Save the current value as the key, shift
+larger values one slot to the right, and put the key into the gap.
 
 ## The order of operations
 
-1. Find the node. If the key is smaller, descend left; if larger, descend right.
-2. If it has fewer than two children, hand back the child that survives.
-3. Otherwise copy the successor's value into the node.
-4. Delete the successor from the right subtree, not from the whole tree.
-
-Copying the value before removing the successor is what keeps the tree ordered
-at every step. Removing first leaves a hole with two orphaned subtrees.
+1. Read the function signature and confirm the array is changed in place.
+2. Decide which part of the array is already known to be sorted.
+3. Compare only the values the algorithm asks for.
+4. Move values carefully so no element is accidentally overwritten.
 
 ## What usually goes wrong
 
-- Returning the node instead of its replacement, so nothing is ever unlinked.
-- Freeing a node that is still reachable from its parent.
-- Searching for the successor in the whole tree instead of the right subtree.
-- Forgetting that erasing the root changes what the caller must hold.
+- Swapping in the wrong comparison direction and sorting descending.
+- Forgetting the inner-loop bound and reading values[i + 1] past the array.
+- Overwriting the selection-sort start value without saving it first.
+- Putting the insertion-sort key back at i instead of j + 1 after shifting.
 
 ## Complexity
 
-Every step moves one level down, so the work is proportional to the height of the
-tree: O(h). For a balanced tree that is O(log n); for a tree built from sorted
-input it degrades to O(n).
+Bubble sort, selection sort and insertion sort are O(n^2) in the usual case
+because each algorithm uses a nested scan over the array. Insertion sort can be
+close to O(n) on input that is already nearly sorted.
 `
 
 const manuals: ManualMeta[] = [
   {
-    id: 'manual-lab-05-bst',
+    id: 'manual-lab-05-sorting',
     labId: 'lab-05',
-    name: 'bst-delete-reference.md',
-    sizeBytes: BST_REFERENCE.length,
+    name: 'sorting-reference.md',
+    sizeBytes: SORTING_REFERENCE.length,
     type: 'md',
     uploadedAt: '2026-10-09T11:30:00.000+05:00',
-    content: BST_REFERENCE,
+    content: SORTING_REFERENCE,
   },
 ]
 
