@@ -5,12 +5,12 @@
 
 ## Reading order
 1. **this file** — rules, ownership, what already exists
-2. `docs/RESEARCH-CONTEXT.md` — why the project exists, the gap, the ethics
-3. `docs/POC-REQUIREMENTS.md` — what "done" means at the Week-4 gate
-4. `docs/POC-ARCHITECTURE.md` — modules, seams, contracts
-5. `docs/TASKS.md` — **the frontend backlog (F0–F10). Start here to write code.**
-6. `docs/EVIDENCE.md` — every measured number. Never invent one.
-7. `docs/GLOSSARY.md` · `docs/DECISIONS.md` — vocabulary, settled choices
+2. `docs/poc/RESEARCH-CONTEXT.md` — why the project exists, the gap, the ethics
+3. `docs/poc/POC-REQUIREMENTS.md` — what "done" means at the Week-4 gate
+4. `docs/poc/POC-ARCHITECTURE.md` — modules, seams, contracts
+5. `docs/poc/TASKS.md` — **the frontend backlog (F0–F10). Start here to write code.**
+6. `docs/poc/EVIDENCE.md` — every measured number. Never invent one.
+7. `docs/poc/GLOSSARY.md` · `docs/poc/DECISIONS.md` — vocabulary, settled choices
 
 ## Before your first change
 - Read 1–5. Do not start coding before you have.
@@ -52,7 +52,7 @@ architecture — see §4.
 
 | Member | Owns | Do not let another member's code creep in here |
 |---|---|---|
-| **Muhammad Zuhair** 23I-0001 | Knowledge tracing, mastery validity, the spike harness | `spike/`, KT service |
+| **Muhammad Zuhair** 23I-0001 | Knowledge tracing, mastery validity, the spike harness | `research/spike/`, `packages/kt/`, KT service |
 | **Muhammad Jawad Ali** 23I-3024 | Telemetry capture, latency, concurrency, dashboard | editor instrumentation, event pipeline |
 | **Abdul Rauf** 23I-0591 | Disclosure policy, leakage guardrail, evaluation | policy engine, guardrail, study |
 
@@ -66,41 +66,47 @@ modify their subsystem live** under panel questioning. Write code they can defen
 ## 3. What already exists in this repo — do not rebuild it
 
 ```
-src/                    React 19 + TS + Vite + Monaco. Two roles behind one shell.
-  App.tsx               router, role switch, demo gate (?demo=1)
-  StudentIde.tsx        the student view; scaffold tutor or baseline assistant
-  instructor/           Overview · Roster · LabsManuals · Submissions · Concepts
+apps/web/               React 19 + TS + Vite + Monaco. Two roles behind one shell.
+  src/
+    App.tsx             router, role switch, demo gate (?demo=1)
+    StudentIde.tsx      the student view; scaffold tutor or baseline assistant
+    instructor/         Overview · Roster · LabsManuals · Submissions · Concepts
                         HintAudit · Settings · StudentDetail
-    selectors.ts        every derived number the screens display
-    format.ts           display formatting only; the dataset keeps full precision
-  components/           Header, ProblemPane, CodeEditor, OutputPanel, TutorPanel,
+      selectors.ts      every derived number the screens display
+      format.ts         display formatting only; the dataset keeps full precision
+    components/         Header, ProblemPane, CodeEditor, OutputPanel, TutorPanel,
                         StatusBar, MasteryBars, ManualViewer, Markdown
-                        (the last three are shared by both roles)
-  state/                CourseState (labs, manuals, policy) · demo (rails, projector)
-  mock/data.ts          the seeded dataset: 47 students, 8 KCs, 6 labs
-  mock/labContent.ts    per-lab examples, ladder, solution, tests, compiler signals
-  providers/
-    HintProvider.ts             interface all hint sources implement
-    MockHintProvider.ts         canned ladder, no model, guardrail applied
-    OllamaBaselineProvider.ts   real local model via Ollama, deliberately unguarded
-    guardrail.ts                output-side disclosure measurement (D15)
-    prompts.json                plain (99 ch) / basic (273) / hardened (2194)
-  mock/compiler.ts      fake compiler + test output
-  data/problems.ts      lab problems, with the guardrail-only reference solution
-spike/                  THE POC. Python, no deps beyond matplotlib.
+    state/              CourseState (labs, manuals, policy) · demo (rails, projector)
+    mock/data.ts        the seeded dataset: 47 students, 8 KCs, 6 labs
+    mock/labContent.ts  per-lab examples, ladder, solution, tests, compiler signals
+    providers/
+      HintProvider.ts             interface all hint sources implement
+      MockHintProvider.ts         canned ladder, no model, guardrail applied
+      OllamaBaselineProvider.ts   real local model via Ollama, deliberately unguarded
+      guardrail.ts                output-side disclosure measurement (D15)
+      prompts.json                plain (99 ch) / basic (273) / hardened (2194)
+    mock/compiler.ts    fake compiler + test output
+    data/problems.ts    lab problems, with the guardrail-only reference solution
+research/spike/         THE POC. Python, no deps beyond matplotlib.
   leakage.py            runs model x prompt x context x profile x attack, N samples
   attacks.json          17 attacks: B0 benign, A1-A6, X1-X10
   disclosure.py         scores every reply on a 0-5 disclosure ladder -> why_kt.png
   chart*.py, aggregate.py
   results/              CSV + markdown per run, charts
+services/api/           FastAPI service (to be built)
+services/runner/        Code execution sandbox (to be built)
+packages/guardrail/     Output-side disclosure guardrail — only place that reads the reference solution
+packages/kt/            Knowledge tracing engine (pyBKT / DKT)
+problems/               Lab problem definitions (statement + reference solution)
+infra/                  docker-compose, env templates
 ```
 
 **Two workstreams, and they are demonstrated together.**
-- **`spike/` is the evidence** — a live experiment, run in a terminal. **Frozen:
+- **`research/spike/` is the evidence** — a live experiment, run in a terminal. **Frozen:
   do not extend it before the gate.** It answers *is the risk real?*
-- **`src/` is the product** — the clickable prototype: student IDE plus a **full
-  instructor dashboard**. Backlog `docs/TASKS.md`, state `docs/PROGRESS.md`,
-  walkthrough `docs/DEMO-SCRIPT.md`. It runs with no backend and no model.
+- **`apps/web/src/` is the product** — the clickable prototype: student IDE plus a **full
+  instructor dashboard**. Backlog `docs/poc/TASKS.md`, state `docs/poc/PROGRESS.md`,
+  walkthrough `docs/poc/DEMO-SCRIPT.md`. It runs with no backend and no model.
 
 A UI mockup alone is not accepted as POC evidence (handbook, Appendix A Stage 0)
 — which is why the spike exists and why it is never described as the frontend.
@@ -183,7 +189,7 @@ vLLM for the deployed model.
 - TypeScript strict. No `any` in `src/providers` or the policy engine.
 - Every provider implements `HintProvider` so sources are swappable.
 - Spike scripts stay **dependency-light** (stdlib + matplotlib) and runnable as
-  `python3 spike/<x>.py`. They must run in seconds on a laptop, live, in a room.
+  `python3 research/spike/<x>.py`. They must run in seconds on a laptop, live, in a room.
 - Results are written as **CSV + markdown + chart**, timestamped, never
   overwritten. The CSV is the evidence; the chart is the slide.
 - Commit messages state what was measured, not what was added.
