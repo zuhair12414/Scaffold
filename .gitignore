@@ -24,8 +24,8 @@ dist-ssr
 *.sw?
 
 # scratch runs
-spike/results/live-*
-spike/results/rerun
+research/spike/results/live-*
+research/spike/results/rerun
 .env.local
 
 # python bytecode
