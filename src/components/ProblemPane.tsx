@@ -5,7 +5,7 @@ import { MasteryBars, type MasteryBarItem } from './MasteryBars'
 import { QuestionList } from './QuestionList'
 import type { Problem } from '../data/problems'
 import type { DemoStage, LabQuestion } from '../mock/labQuestions'
-import type { Lab, LabPolicy, ManualMeta, Submission } from '../types'
+import type { Lab, ManualMeta, Submission } from '../types'
 
 function when(iso: string) {
   const date = new Date(iso)
@@ -30,7 +30,6 @@ type Props = {
   questionAttempts: Submission[]
   attempts: Submission[]
   manuals?: ManualMeta[]
-  policy?: LabPolicy | null
   mastery?: MasteryBarItem[]
   recording?: boolean
   onOpenManual?: (manual: ManualMeta) => void
@@ -52,7 +51,6 @@ export function ProblemPane({
   questionAttempts,
   attempts,
   manuals = [],
-  policy = null,
   mastery = [],
   recording = false,
   onOpenManual,
@@ -106,12 +104,6 @@ export function ProblemPane({
         </>
       )}
 
-      {policy && policy.maxHintLevel < 4 && (
-        <>
-          <div className="sec">Hint policy</div>
-          <p className="hint-policy-note">Your instructor capped hints at Level {policy.maxHintLevel} for this lab</p>
-        </>
-      )}
 
       {p.examples.length > 0 && (
         <>

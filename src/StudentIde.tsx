@@ -9,7 +9,6 @@ import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { problems, registerQuestionProblem, type Problem } from './data/problems'
 import { questionsForLab, type DemoStage } from './mock/labQuestions'
 import { mockRun, type RunResult } from './mock/compiler'
-import { MockHintProvider } from './providers/MockHintProvider'
 import { OllamaBaselineProvider } from './providers/OllamaBaselineProvider'
 import type { HintProvider } from './providers/HintProvider'
 import { useCourse } from './state/useCourse'
@@ -20,13 +19,7 @@ import type { ChatTurn, ContextMode, HintResponse, KnowledgeComponentId, Level, 
 import prompts from './providers/prompts.json'
 
 const PROBLEM = 'P02'
-// Long enough to interrupt hint-spam, short enough to demonstrate in a room.
-const ESCALATE_COOLDOWN_MS = 12_000
 const SNOOZE_MS = 10 * 60_000
-// Default to the product tutor: it needs no model and no backend, so the demo runs
-// anywhere. VITE_TUTOR_MODE=baseline starts on the unguarded assistant instead, and
-// the switch in the tutor header moves between them live.
-const INITIAL_MODE: 'scaffold' | 'baseline' = import.meta.env.VITE_TUTOR_MODE === 'baseline' ? 'baseline' : 'scaffold'
 // The student view is one student's screen. It is the divergent student the
 // instructor console opens first, so the same person is visible from both sides.
 const DEMO_STUDENT_ID = 'student-31'
@@ -56,7 +49,7 @@ export default function StudentIde() {
   const { labId } = useParams()
   const {
     labs, currentLab, currentPolicy, manuals, manualFiles, policies,
-    sessionSubmissions, sessionChat, submitAttempt, logHint, appendChat,
+    sessionSubmissions, sessionChat, submitAttempt, appendChat,
   } = useCourse()
   const assignedLabs = useMemo(() => (
     labs.filter((lab) => lab.status !== 'draft').sort((a, b) => b.number - a.number)
@@ -130,7 +123,6 @@ export default function StudentIde() {
     return cardsFromChat
   }, [questionChat])
 
-  const [mode, setMode] = useState<'scaffold' | 'baseline'>(INITIAL_MODE)
   const [code, setCode] = useKeyedState(workspaceKey, p.starter)
   const [cursor, setCursor] = useState({ ln: 1, col: 1 })
   const [problemOpen, setProblemOpen] = useState(true)
@@ -146,9 +138,6 @@ export default function StudentIde() {
   const [highlight, setHighlight] = useKeyedState<{ lines: number[]; message: string } | null>(workspaceKey, null)
   const [failedRuns, setFailedRuns] = useState(0)
   const [nudge, setNudge] = useState<Nudge>('idle')
-  const [snoozedUntil, setSnoozedUntil] = useState(0)
-  const [lastHintAt, setLastHintAt] = useState(0)
-  const [activitySinceHint, setActivitySinceHint] = useState(true)
   const initialVariant = (['plain', 'basic', 'hardened'].includes(import.meta.env.VITE_PROMPT) ? import.meta.env.VITE_PROMPT : 'plain') as 'plain' | 'basic' | 'hardened'
   const [promptVariant, setPromptVariant] = useState<PromptVariant>(initialVariant)
   const [systemPrompt, setSystemPrompt] = useState<string>(prompts[initialVariant])
@@ -157,10 +146,9 @@ export default function StudentIde() {
   // assistant a student uses, and these stay off unless the spike turns them on.
   const context: ContextMode = 'none'
   const profile: ProfileMode = 'none'
-  const [now, setNow] = useState(() => Date.now())
   const provider = useMemo<HintProvider>(
-    () => (mode === 'scaffold' ? new MockHintProvider() : new OllamaBaselineProvider(model)),
-    [mode, model],
+    () => new OllamaBaselineProvider(model),
+    [model],
   )
   const similarityThreshold = activePolicy?.similarityThreshold ?? 0.6
   // The student's own concept estimates, with the uncertainty band the instructor sees.
@@ -201,24 +189,6 @@ export default function StudentIde() {
   const currentLevel: Level = cards.length ? cards[cards.length - 1].level : 0
   const maxHintLevel = activePolicy?.maxHintLevel ?? 4
 
-  // Escalation gate: one level per edit or run, plus a cooldown.
-  const canEscalate = useMemo(() => {
-    if (mode === 'baseline') return { ok: false, why: '' }
-    if (activePolicy && !activePolicy.escalationAllowed) return { ok: false, why: 'Instructor has paused escalation for this lab' }
-    if (cards.length === 0) return { ok: false, why: 'Ask for a hint first' }
-    if (currentLevel >= maxHintLevel) return { ok: false, why: `Available up to Level ${maxHintLevel}` }
-    if (!activitySinceHint) return { ok: false, why: 'Edit your code or run it before asking for more' }
-    const left = Math.ceil((lastHintAt + ESCALATE_COOLDOWN_MS - now) / 1000)
-    if (left > 0) return { ok: false, why: `Available in ${left}s` }
-    return { ok: true, why: '' }
-  }, [cards.length, currentLevel, activitySinceHint, lastHintAt, now, activePolicy, maxHintLevel, mode])
-
-  useEffect(() => {
-    if (!tutorOpen) return
-    const id = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(id)
-  }, [tutorOpen])
-
   useEffect(() => {
     startedAt.current = { key: workspaceKey, value: Date.now() }
   }, [workspaceKey])
@@ -254,7 +224,7 @@ export default function StudentIde() {
     setThinking(true)
     log('hint', { level: requestedLevel, trigger, question })
     const id = nextId.current++
-    const isBaseline = mode === 'baseline'
+    const isBaseline = true
     if (isBaseline) {
       setCards((cs) => [...cs, { id, trigger, level: 0, text: '', source: 'baseline', model, promptVariant, context, profile, streaming: true, question, guardrail: { leaked: false, stripped: false } }])
     }
@@ -276,24 +246,6 @@ export default function StudentIde() {
     setCards((cs) => (cs.some((c) => c.id === id)
       ? cs.map((c) => (c.id === id ? { ...c, ...res, streaming: false, question } : c))
       : [...cs, { ...res, id, trigger }]))
-    // Close the loop: what the guardrail decided here is what the instructor's
-    // Hint Audit shows, with the level, the measured similarity and the threshold.
-    if (mode === 'scaffold' && activeLab) {
-      const blocked = Boolean(res.guardrail?.blocked)
-      logHint({
-        studentId: DEMO_STUDENT_ID,
-        labId: activeLab.id,
-        questionId: p.id,
-        level: res.level,
-        blocked,
-        similarity: res.guardrail?.similarity ?? 0,
-        threshold: res.guardrail?.threshold ?? similarityThreshold,
-        reason: res.guardrail?.reason ?? 'within lab disclosure policy',
-        promptContextSummary: `${p.title}: ${p.concepts.map((concept) => concept.name).join(', ')}`,
-        shownText: res.text,
-        withheldText: blocked ? 'A code-shaped answer with the missing step was withheld.' : undefined,
-      })
-    }
     if (activeLab) {
       if (question) {
         appendChat({ studentId: DEMO_STUDENT_ID, labId: activeLab.id, questionId: p.id, role: 'student', text: question })
@@ -307,13 +259,11 @@ export default function StudentIde() {
         pseudocode: res.pseudocode,
         level: res.level,
         blocked: Boolean(res.guardrail?.blocked),
-        source: mode === 'baseline' ? 'baseline' : 'scaffold',
+        source: 'baseline',
       })
     }
     if (res.highlightLines) setHighlight({ lines: res.highlightLines, message: res.text })
-    setLastHintAt(Date.now())
-    setActivitySinceHint(false)
-  }, [code, mastery, struggle, p, log, logHint, appendChat, activeLab, promptVariant, systemPrompt, model, context, profile, maxHintLevel, mode, provider, similarityThreshold, setCards, setHighlight])
+  }, [code, mastery, struggle, p, log, appendChat, activeLab, promptVariant, systemPrompt, model, context, profile, maxHintLevel, provider, similarityThreshold, setCards, setHighlight])
 
   const policyLevel = useCallback((): Level => {
     const level = cards.length ? currentLevel : failedRuns >= 3 ? 1 : 0
@@ -325,7 +275,6 @@ export default function StudentIde() {
     setRun(r)
     setOutputOpen(true)
     setTab(r.diagnostics.length ? 'diagnostics' : 'tests')
-    setActivitySinceHint(true)
     log('run', { ok: r.ok, diagnostics: r.diagnostics.length })
     r.diagnostics.forEach((d) => {
       if (!explanations[d.cls]) provider.explainDiagnostic(d).then((t) => setExplanations((e) => ({ ...e, [d.cls]: t })))
@@ -333,11 +282,10 @@ export default function StudentIde() {
     if (r.ok) { setHighlight(null); setFailedRuns(0); setNudge('idle'); return }
     const n = failedRuns + 1
     setFailedRuns(n)
-    if (mode === 'scaffold' && n >= 2 && !tutorOpen && Date.now() > snoozedUntil && nudge !== 'nudge') setNudge('nudge')
-  }, [code, p, failedRuns, tutorOpen, snoozedUntil, nudge, explanations, log, mode, provider, setRun, setOutputOpen, setHighlight])
+  }, [code, p, failedRuns, explanations, log, provider, setRun, setOutputOpen, setHighlight])
 
   const snooze = useCallback(() => {
-    setSnoozedUntil(Date.now() + SNOOZE_MS); setNudge('snoozed'); log('snooze')
+    setNudge('snoozed'); log('snooze')
     setTimeout(() => setNudge((s) => (s === 'snoozed' ? 'idle' : s)), SNOOZE_MS)
   }, [log])
 
@@ -354,11 +302,11 @@ export default function StudentIde() {
     run: doRun,
     toggleTutor: () => setTutorOpen((o) => !o),
     requestHint: () => requestHint(policyLevel(), 'requested'),
-    escalate: () => { if (canEscalate.ok) { log('escalate'); requestHint(Math.min(currentLevel + 1, maxHintLevel) as Level, 'escalated') } },
+    escalate: () => {},
     toggleProblem: () => setProblemOpen((o) => !o),
     toggleOutput: () => setOutputOpen((o) => !o),
     snooze,
-  }), [doRun, requestHint, policyLevel, canEscalate.ok, log, currentLevel, maxHintLevel, snooze, setOutputOpen])
+  }), [doRun, requestHint, policyLevel, snooze, setOutputOpen])
 
   useEffect(() => {
     actions.current = editorActions
@@ -395,7 +343,6 @@ export default function StudentIde() {
     setDemoStage(stage)
     setRun(null)
     setHighlight(null)
-    setActivitySinceHint(true)
     notify(stage === 'empty' ? 'Editor reset to the starter code' : `Editor filled with the ${stage} state (demo only)`)
   }, [activeQuestion, setCode, setDemoStage, setRun, setHighlight])
 
@@ -412,7 +359,7 @@ export default function StudentIde() {
       <Header
         lab={p.lab}
         title={p.title}
-        hintLabel={mode === 'baseline' ? 'Ask' : 'Hint'}
+        hintLabel="Ask AI"
         onRun={doRun}
         onHint={() => setTutorOpen((o) => !o)}
         onSubmit={activeLab && activeLab.status !== 'closed' ? submit : undefined}
@@ -425,9 +372,8 @@ export default function StudentIde() {
           collapsed={!problemOpen}
           lite={LITE}
           manuals={activeManuals}
-          policy={mode === 'scaffold' ? activePolicy : null}
-          mastery={mode === 'scaffold' ? masteryBars : []}
-          recording={mode === 'scaffold'}
+          mastery={masteryBars}
+          recording
           lab={activeLab}
           questions={questions}
           activeQuestionId={activeQuestion.id}
@@ -444,7 +390,7 @@ export default function StudentIde() {
         <div className="center">
           <CodeEditor
             value={code}
-            onChange={(v) => { setCode(v); setActivitySinceHint(true); log('edit', { len: v.length }) }}
+            onChange={(v) => { setCode(v); log('edit', { len: v.length }) }}
             onCursor={(ln, col) => setCursor({ ln, col })}
             highlight={highlight}
             actions={actions}
@@ -463,20 +409,16 @@ export default function StudentIde() {
               // The bare PoC-lite output belongs to the baseline condition. The
               // product tutor shows test results and the plain-English diagnostic,
               // because the student is meant to act on them.
-              lite={LITE && mode === 'baseline'}
+              lite={LITE}
             />
           )}
           {outputOpen && !run && <div />}
         </div>
         {tutorOpen && (
           <TutorPanel
-            mode={mode}
-            onMode={setMode}
             questionLabel={`Q${activeQuestion.number} · ${activeQuestion.title}`}
             draft={draft}
             onDraft={setDraft}
-            maxHintLevel={maxHintLevel}
-            similarityThreshold={similarityThreshold}
             lite={LITE}
             promptVariant={promptVariant}
             systemPrompt={systemPrompt}
@@ -485,7 +427,6 @@ export default function StudentIde() {
             onModel={setModel}
             cards={cards}
             thinking={thinking}
-            canEscalate={canEscalate}
             onClose={() => setTutorOpen(false)}
             onAsk={(q) => requestHint(policyLevel(), 'requested', q || undefined)}
             // A probe asks for the finished answer. The policy still decides the
@@ -493,7 +434,6 @@ export default function StudentIde() {
             // escalation, so the guardrail measures the highest level the lab allows.
             onAttack={(q) => requestHint(maxHintLevel as Level, 'escalated', q)}
             onClear={() => { provider.reset?.(); setCards([]); setHighlight(null) }}
-            onEscalate={editorActions.escalate}
           />
         )}
         {!tutorOpen && <div />}

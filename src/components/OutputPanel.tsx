@@ -11,6 +11,27 @@ type Props = {
   lite?: boolean
 }
 
+function insight(d: Diagnostic) {
+  if (d.severity === 'error') {
+    return {
+      title: 'Syntax or signature issue',
+      text: 'The code did not compile. Check the function name, parameters and syntax at the highlighted line first.',
+    }
+  }
+
+  return {
+    title: 'Syntax OK, implementation incomplete',
+    text: explanationsText(d),
+  }
+}
+
+function explanationsText(d: Diagnostic) {
+  if (d.cls.includes('no-swap')) return 'Your loops are present, but the array never changes because the adjacent values are not swapped yet.'
+  if (d.cls.includes('no-min')) return 'The scan is started, but it does not yet select the smallest remaining value before the swap.'
+  if (d.cls.includes('no-shift')) return 'The key is saved, but larger values are not shifted and the key is not inserted back into the open slot.'
+  return 'The program compiles, but the required algorithm step is still missing, so the tests cannot pass yet.'
+}
+
 export function OutputPanel({ tab, setTab, diagnostics, explanations, tests, onClose, onJump, lite = false }: Props) {
   const passed = tests.filter((t) => t.passed).length
   const hidden = tests.filter((t) => t.hidden)
@@ -34,6 +55,15 @@ export function OutputPanel({ tab, setTab, diagnostics, explanations, tests, onC
           ? <div className="empty">{lite ? 'Compiled. No diagnostics.' : 'No diagnostics. Compiled cleanly.'}</div>
           : diagnostics.map((d, i) => (
             <div className={'diag' + (lite ? ' raw-only' : '')} key={i}>
+              {(() => {
+                const note = insight(d)
+                return (
+                  <div className="run-insight">
+                    <span>{note.title}</span>
+                    <p>{note.text}</p>
+                  </div>
+                )
+              })()}
               <div className="raw">
                 <i className={'dot ' + (d.severity === 'error' ? 'fail' : 'warn')} />
                 <div>
