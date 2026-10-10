@@ -31,3 +31,4 @@ research/spike/results/rerun
 # python bytecode
 __pycache__/
 *.pyc
+.venv/
