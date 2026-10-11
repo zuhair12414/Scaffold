@@ -17,7 +17,8 @@ import { mockData } from './mock/data'
 import { notify } from './state/toast'
 import type { ChatTurn, ContextMode, HintResponse, KnowledgeComponentId, Level, ManualMeta, ProfileMode, PromptVariant, StruggleSignal, TelemetryEvent } from './types'
 import prompts from './providers/prompts.json'
-import { ConsoleSink, createEmitter } from './telemetry/sink'
+import { createEmitter } from './telemetry/sink'
+import { WebSocketSink } from './telemetry/WebSocketSink'
 
 const PROBLEM = 'P02'
 const SNOOZE_MS = 10 * 60_000
@@ -198,9 +199,9 @@ export default function StudentIde() {
     }
   }, [sessionId, activeLabId, activeQId])
 
-  // Console sink emitter for new typed telemetry events.
+  // WebSocket network sink for transmitting typed telemetry events to ingestion server.
   const [telemetryEmitter] = useState(() => {
-    return createEmitter(() => contextRef.current, new ConsoleSink())
+    return createEmitter(() => contextRef.current, new WebSocketSink())
   })
 
   const log = useCallback((kind: TelemetryEvent['kind'], payload: Record<string, unknown> = {}) => {

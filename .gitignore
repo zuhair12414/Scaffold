@@ -31,3 +31,7 @@ spike/results/rerun
 # python bytecode
 __pycache__/
 *.pyc
+
+# telemetry storage
+data/
+
