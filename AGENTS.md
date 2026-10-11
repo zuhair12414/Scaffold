@@ -52,9 +52,9 @@ architecture — see §4.
 
 | Member | Owns | Do not let another member's code creep in here |
 |---|---|---|
-| **Muhammad Zuhair** 23I-0001 | Knowledge tracing, mastery validity, the spike harness | `spike/`, KT service |
-| **Muhammad Jawad Ali** 23I-3024 | Telemetry capture, latency, concurrency, dashboard | editor instrumentation, event pipeline |
-| **Abdul Rauf** 23I-0591 | Disclosure policy, leakage guardrail, evaluation | policy engine, guardrail, study |
+| **Muhammad Zuhair** 23I-0001 | Knowledge tracing and the baseline DKT, open source model integration, context management, the spike harness | `spike/`, KT service |
+| **Abdul Rauf** 23I-0591 | IDE telemetry design and capture, the student IDE and hint interface, the faculty frontend | editor instrumentation, student IDE, faculty dashboard |
+| **Muhammad Jawad Ali** 23I-3024 | Backend, event storage, the compile and run sandbox, deployment and load tests | backend, event storage, sandbox, deployment |
 
 Supervisor: Ma'am Rabail Zahid.
 
