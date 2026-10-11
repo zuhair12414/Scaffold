@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "telemetry:server": "node tools/telemetry-server/server.mjs",
+    "telemetry:verify": "node tools/telemetry-server/verify.mjs data/telemetry"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
@@ -20,9 +22,11 @@
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
+    "@types/ws": "^8.18.2",
     "@vitejs/plugin-react": "^6.1.0",
     "oxlint": "^1.79.0",
     "typescript": "~6.0.2",
-    "vite": "^8.2.2"
+    "vite": "^8.2.2",
+    "ws": "^8.22.0"
   }
 }

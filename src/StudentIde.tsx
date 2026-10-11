@@ -17,6 +17,8 @@ import { mockData } from './mock/data'
 import { notify } from './state/toast'
 import type { ChatTurn, ContextMode, HintResponse, KnowledgeComponentId, Level, ManualMeta, ProfileMode, PromptVariant, StruggleSignal, TelemetryEvent } from './types'
 import prompts from './providers/prompts.json'
+import { createEmitter } from './telemetry/sink'
+import { WebSocketSink } from './telemetry/WebSocketSink'
 
 const PROBLEM = 'P02'
 const SNOOZE_MS = 10 * 60_000
@@ -174,6 +176,33 @@ export default function StudentIde() {
 
   const telemetry = useRef<TelemetryEvent[]>([])
   const nextId = useRef(1)
+
+  // One session ID per browser session for telemetry envelope.
+  const [sessionId] = useState(() => `sess-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`)
+  const activeLabId = activeLab?.id ?? ''
+  const activeQId = activeQuestion?.id ?? p.id
+
+  // Active context ref so emitter always sees the latest labId and questionId.
+  const contextRef = useRef({
+    sessionId,
+    studentId: DEMO_STUDENT_ID,
+    labId: activeLabId,
+    questionId: activeQId,
+  })
+
+  useEffect(() => {
+    contextRef.current = {
+      sessionId,
+      studentId: DEMO_STUDENT_ID,
+      labId: activeLabId,
+      questionId: activeQId,
+    }
+  }, [sessionId, activeLabId, activeQId])
+
+  // WebSocket network sink for transmitting typed telemetry events to ingestion server.
+  const [telemetryEmitter] = useState(() => {
+    return createEmitter(() => contextRef.current, new WebSocketSink())
+  })
 
   const log = useCallback((kind: TelemetryEvent['kind'], payload: Record<string, unknown> = {}) => {
     telemetry.current.push({ t: new Date().toISOString(), kind, payload })
@@ -396,6 +425,7 @@ export default function StudentIde() {
             actions={actions}
             lite={LITE}
             path={`${p.id}.cpp`}
+            telemetry={telemetryEmitter}
           />
           {outputOpen && run && (
             <OutputPanel
