@@ -312,3 +312,14 @@ The baseline shows **no levels at all**, including on turns the scaffold tutor
 wrote earlier in the same conversation. A level is a disclosure decision, the
 baseline makes none, and showing one there would blur the only difference the
 comparison exists to demonstrate.
+
+### D26 · Mid 1 telemetry client and local test server (2026-10-11)
+**Why:** validating real IDE telemetry capture, transport buffering, retry semantics,
+and load characteristics requires a working telemetry client and a test recipient.
+**Decision:** for the Mid 1 telemetry work only, the rules "no backend" and
+"never fetch" in `docs/TASKS.md` and `docs/POC-ARCHITECTURE.md` section 6 are lifted
+for the telemetry client and a local test server.
+**Consequence:** all other rules stay in effect (no database, no auth, no external
+backend services, student code and chat text remain strictly excluded from telemetry).
+The old rules themselves remain unchanged for everything outside this scope.
+
