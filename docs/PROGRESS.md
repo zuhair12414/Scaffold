@@ -169,3 +169,16 @@ across the six under review.
   into the next task.
 - The header submit action now names the active lab, for example `Submit Lab 5`,
   and continues to store the attempt against that selected lab.
+
+## Mid 1 telemetry
+
+| Task | State | Checked by |
+|---|---|---|
+| Schema | not started | pending |
+| Editor capture | not started | pending |
+| Transport and test server | not started | pending |
+| Wiring | not started | pending |
+| Status and opt out | not started | pending |
+| Load simulator | not started | pending |
+| Evidence | not started | pending |
+
