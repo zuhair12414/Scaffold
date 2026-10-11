@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import Editor, { type OnMount } from '@monaco-editor/react'
 import { editorFont, editorTheme, monaco } from '../monaco-setup'
+import { attachEditorCapture, type TelemetryEmitFn } from '../telemetry/captureEditor'
 
 type Ed = Parameters<OnMount>[0]
 export type EditorActions = {
@@ -17,11 +18,21 @@ type Props = {
   // One Monaco model per question: switching questions switches the buffer and
   // its undo history instead of writing the old text into the new question.
   path?: string
+  // Optional telemetry emitter for capturing student editor interactions.
+  telemetry?: TelemetryEmitFn
 }
 
-export function CodeEditor({ value, onChange, onCursor, highlight, actions, lite = false, path = 'main.cpp' }: Props) {
+export function CodeEditor({ value, onChange, onCursor, highlight, actions, lite = false, path = 'main.cpp', telemetry }: Props) {
   const edRef = useRef<Ed | null>(null)
   const decos = useRef<ReturnType<Ed['createDecorationsCollection']> | null>(null)
+  const captureCleanup = useRef<(() => void) | null>(null)
+  // Track value received from user onChange versus value injected from props.
+  const lastUserValue = useRef<string>(value)
+  const parentValue = useRef<string>(value)
+
+  useEffect(() => {
+    parentValue.current = value
+  }, [value])
 
   const onMount: OnMount = (ed) => {
     edRef.current = ed
@@ -36,7 +47,28 @@ export function CodeEditor({ value, onChange, onCursor, highlight, actions, lite
     ed.addCommand(K.CtrlCmd | C.KeyJ, () => actions.current.toggleOutput())
     ed.addCommand(K.CtrlCmd | K.Shift | C.KeyS, () => actions.current.snooze())
     ed.focus()
+
+    if (telemetry) {
+      // Programmatic edits occur when parent passes a new value not originating from typing (e.g. question switch, demo fill).
+      const isProgramEdit = () => {
+        const model = ed.getModel()
+        const currentModelText = model ? model.getValue() : ''
+        return currentModelText === parentValue.current && currentModelText !== lastUserValue.current
+      }
+      const capture = attachEditorCapture(ed, monaco, telemetry, isProgramEdit)
+      captureCleanup.current = capture.dispose
+    }
   }
+
+  useEffect(() => {
+    return () => {
+      // Clean up telemetry listeners when editor unmounts.
+      if (captureCleanup.current) {
+        captureCleanup.current()
+        captureCleanup.current = null
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (!decos.current) return
@@ -62,7 +94,11 @@ export function CodeEditor({ value, onChange, onCursor, highlight, actions, lite
         theme={editorTheme}
         path={path}
         value={value}
-        onChange={(v) => onChange(v ?? '')}
+        onChange={(v) => {
+          const nextVal = v ?? ''
+          lastUserValue.current = nextVal
+          onChange(nextVal)
+        }}
         onMount={onMount}
         loading={<div className="empty" style={{ padding: 16 }}>Loading editor</div>}
         options={{
