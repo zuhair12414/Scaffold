@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  web:
+    name: web — typecheck & build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc -b --noEmit
+
+      - name: Build
+        run: npm run build
+
+  python:
+    name: python — pytest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Find Python folders with tests
+        id: find-tests
+        run: |
+          dirs=$(find . -name "test_*.py" -o -name "*_test.py" \
+            | grep -v node_modules | grep -v .git \
+            | xargs -I{} dirname {} | sort -u | tr '\n' ' ')
+          echo "dirs=$dirs" >> "$GITHUB_OUTPUT"
+          echo "Found test dirs: $dirs"
+
+      - name: Install pytest (and per-folder requirements if present)
+        if: steps.find-tests.outputs.dirs != ''
+        run: |
+          pip install pytest
+          for dir in ${{ steps.find-tests.outputs.dirs }}; do
+            if [ -f "$dir/requirements.txt" ]; then
+              pip install -r "$dir/requirements.txt"
+            fi
+          done
+
+      - name: Run pytest
+        if: steps.find-tests.outputs.dirs != ''
+        run: pytest ${{ steps.find-tests.outputs.dirs }} -v
