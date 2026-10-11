@@ -32,3 +32,6 @@ research/spike/results/rerun
 __pycache__/
 *.pyc
 .venv/
+
+# Office lock files
+~$*
