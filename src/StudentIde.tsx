@@ -200,15 +200,28 @@ export default function StudentIde() {
   }, [sessionId, activeLabId, activeQId])
 
   // WebSocket network sink for transmitting typed telemetry events to ingestion server.
+  const [sink] = useState(() => new WebSocketSink())
   const emitterRef = useRef<ReturnType<typeof createEmitter> | null>(null)
+  const [optedOut, setOptedOut] = useState(() => sink.getOptOut())
+  const [sinkStatus, setSinkStatus] = useState(() => sink.status())
+
+  useEffect(() => {
+    // Subscribe to sink status updates to reflect pending queue size and connection states live.
+    const unsubscribe = sink.subscribe((s) => {
+      setSinkStatus(s)
+    })
+    return () => {
+      unsubscribe()
+    }
+  }, [sink])
 
   useEffect(() => {
     if (!emitterRef.current) {
-      const emitter = createEmitter(() => contextRef.current, new WebSocketSink())
+      const emitter = createEmitter(() => contextRef.current, sink)
       emitterRef.current = emitter
       emitter('session_start', { schemaVersion: SCHEMA_VERSION })
     }
-  }, [])
+  }, [sink])
 
   const telemetryEmitter = useCallback(<K extends TelemetryEventType>(
     type: K,
@@ -218,6 +231,26 @@ export default function StudentIde() {
       emitterRef.current(type, payload)
     }
   }, [])
+
+  // Handles student toggling the behavioral telemetry opt-out switch.
+  const handleToggleShareData = useCallback((share: boolean) => {
+    const nextOptOut = !share
+    sink.setOptOut(nextOptOut)
+    setOptedOut(nextOptOut)
+    // Emit operational notification indicating whether capture was suspended or resumed.
+    telemetryEmitter(nextOptOut ? 'opt_out' : 'opt_in', undefined)
+  }, [sink, telemetryEmitter])
+
+  // Formats current sink status into concise status bar text.
+  const sinkStatusText = useMemo(() => {
+    if (optedOut) {
+      return 'Capture off'
+    }
+    if (sinkStatus.status === 'connected') {
+      return `Capture on, ${sinkStatus.pendingEvents} pending`
+    }
+    return `Reconnecting, ${sinkStatus.pendingEvents} pending`
+  }, [optedOut, sinkStatus.status, sinkStatus.pendingEvents])
 
   // Emits compile and run events from a single helper to simplify replacing mockRun with a real sandbox later.
   const emitRunEvents = useCallback((r: RunResult) => {
@@ -434,6 +467,8 @@ export default function StudentIde() {
         onSubmit={activeLab && activeLab.status !== 'closed' ? submit : undefined}
         submitState={submitState}
         submitLabel={activeLab ? `Submit Lab ${activeLab.number}` : 'Submit'}
+        shareData={!optedOut}
+        onToggleShareData={handleToggleShareData}
       />
       <div className="main">
         <ProblemPane
@@ -516,6 +551,7 @@ export default function StudentIde() {
         />
       )}
       <StatusBar ln={cursor.ln} col={cursor.col} nudge={nudge} lite={LITE}
+        sinkStatusText={sinkStatusText}
         onNudgeClick={() => (nudge === 'nudge' ? requestHint(policyLevel(), 'proactive') : setTutorOpen((o) => !o))}
         onSnooze={snooze} />
     </div>
