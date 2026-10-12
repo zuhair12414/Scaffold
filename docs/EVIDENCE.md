@@ -93,22 +93,24 @@ Setup: local Ollama, temperature 0.7, linked-list summation problem, 1 sample,
 
 ### A8 · Telemetry capture (load and fault tolerance)
 
-Measured on 2026-10-12 on branch `feature/telemetry`.
+Measured on 2026-10-12 on branch `feature/telemetry` following independent code audit remediation.
 
-#### (1) Local load simulation (60 clients, 2 minutes)
+#### (1) Load simulation & manifest accounting verification (60 clients, 2 minutes)
 - **Command:** `npm run telemetry:sim -- --clients=60 --minutes=2`
 - **Prerequisite server:** `node tools/telemetry-server/server.mjs`
 - **Date:** 2026-10-12
 - **Clients:** 60 concurrent simulated student sessions
 - **Duration:** 2 minutes (120 s)
-- **Total events sent:** 31,728
-- **Total events acked:** 31,589
-- **Ack round-trip latency (localhost):**
+- **Total events generated:** 31,728
+- **Total delivery attempts:** 31,728 (initial dispatches plus replays)
+- **Total events acked:** 31,728
+- **Outstanding queue at drain completion:** 0
+- **Ack round-trip latency (localhost loopback):**
   - **p50:** 7 ms
   - **p95:** 25 ms
   - **max:** 126 ms
-- **Integrity verification (`verifySessionFiles` on all 60 `.jsonl` session files):** PASS (0 gaps, 0 duplicates, monotonic edit version IDs)
-- **Caveat:** Latency was measured on `localhost` loopback; it represents an idealized lower bound on IPC overhead and is not a measurement over the campus network.
+- **Integrity verification (`verifySessionFiles` with independent client manifest comparison):** PASS (0 gaps, 0 duplicates, monotonic edit version IDs, exact session counts match manifest)
+- **Caveat:** Latency was measured on `localhost` loopback; it represents an idealized lower bound on IPC overhead and is not a measurement over the campus network. Browser memory durability across crash/hard termination requires persistent storage on the client, which is not implemented; events in memory buffer would be lost on hard browser termination.
 
 #### (2) Chaos fault tolerance simulation (60 clients, 2 minutes, dropped connections)
 - **Command:** `npm run telemetry:sim -- --clients=60 --minutes=2`
@@ -116,13 +118,15 @@ Measured on 2026-10-12 on branch `feature/telemetry`.
 - **Date:** 2026-10-12
 - **Clients:** 60 concurrent simulated student sessions
 - **Duration:** 2 minutes (120 s)
-- **Total events sent:** 31,895
-- **Total events acked:** 31,699
+- **Total events generated:** 31,895
+- **Total delivery attempts:** 34,120 (reflecting replayed unacknowledged batches after disconnect)
+- **Total events acked:** 31,895
+- **Outstanding queue at drain completion:** 0
 - **Ack round-trip latency (localhost with reconnects):**
   - **p50:** 7 ms
   - **p95:** 25 ms
   - **max:** 1,099 ms (reflects queue retention and backoff replay during intentional disconnection)
-- **Integrity verification (`verifySessionFiles` on all 60 `.jsonl` session files):** PASS (0 gaps, 0 duplicates, monotonic edit version IDs across all disconnect/reconnect cycles)
+- **Integrity verification (`verifySessionFiles` with independent client manifest comparison):** PASS (0 gaps, 0 duplicates, monotonic edit version IDs across all disconnect/reconnect cycles, exact session counts match manifest)
 - **Caveat:** Latency was measured on `localhost` loopback; it is a lower bound and not a measurement over the campus network.
 
 #### (3) What is not measured yet

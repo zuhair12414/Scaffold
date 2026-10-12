@@ -167,11 +167,16 @@ The server responds with an acknowledgement recording the continuous prefix stor
 ## 3. Privacy guarantees: What is never sent
 
 In accordance with ethics guidelines and the project specification:
-1. **Student source code:** Full buffer snapshots, line contents, tokens, and raw keystrokes are **never** transmitted. Only character deltas (`ins`, `del`), line indices, and version numbers are collected.
-2. **Pasted content:** Raw pasted clipboard text is **never** transmitted. Only character length, line count, and a one-way cryptographic hash (`sha1` or deterministic fallback) are transmitted to measure delegation bursts.
+1. **Student source code:** Full buffer snapshots, line contents, tokens, and raw keystrokes are **never** transmitted. Only character deltas (`ins`, `del`), line indices, and monotonic version numbers are collected.
+2. **Pasted content:** Raw pasted clipboard text is **never** transmitted. Only character length, line count, paste origin (`inside_editor` vs `outside`), and an unsalted one-way cryptographic hash digest (`sha1` or deterministic FNV-1a fallback) are transmitted to measure delegation bursts.
+   - *Threat Model & Limitation:* Because the client-side hash is unsalted, predictable short C++ boilerplate strings (such as `#include <iostream>` or standard function signatures) can be identified via dictionary/precomputation attacks. The hash is used solely to distinguish internal editor rearrangements (`inside_editor`) from external clipboard imports (`outside`), not as a secure pseudonymization mechanism. The backend pipeline treats this hash as a cluster identifier for identical snippet reuse across lab sessions, not as private entropy.
 3. **Chat and prompt text:** Student-entered questions, prompts, and assistant response texts are **never** transmitted in telemetry streams. Only disclosure levels, trigger reasons, and latency metrics are logged.
 4. **Student credentials & campus identifiers:** Passwords, student emails, and external network identifiers are excluded.
-5. **Opt-out compliance:** When a student opts out of telemetry, the client immediately stops emitting all behavioural events (`edit`, `paste`, `cursor`, `focus`, `blur`, `idle_start`, `idle_end`). Only non-behavioural operational milestones (`compile`, `run`, `submit`, `opt_out`, `opt_in`) are transmitted.
+5. **Opt-out compliance & sequence continuity:** When a student opts out of telemetry:
+   - Behavioral editor listeners and idle timers are completely detached/suspended at the sensor layer.
+   - Pre-opt-out queued events drain normally to prevent sequence disruption.
+   - Any behavioral events presented during opt-out are discarded before sequence allocation (`shouldDrop`), guaranteeing that transmitted sequences remain strictly contiguous and monotonic (`1..N`).
+   - Non-behavioural operational milestones (`compile`, `run`, `submit`, `opt_out`, `opt_in`) continue to be transmitted with seamless, gap-free sequence acknowledgement.
 
 ---
 
