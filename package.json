@@ -9,7 +9,8 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "telemetry:server": "node tools/telemetry-server/server.mjs",
-    "telemetry:verify": "node tools/telemetry-server/verify.mjs data/telemetry"
+    "telemetry:verify": "node tools/telemetry-server/verify.mjs data/telemetry",
+    "telemetry:sim": "node tools/telemetry-sim/sim.mjs"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
