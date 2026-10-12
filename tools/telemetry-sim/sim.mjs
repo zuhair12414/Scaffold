@@ -6,12 +6,13 @@ import fs from 'node:fs'
 import path from 'node:path'
 import WebSocket from 'ws'
 
-// Command line argument parser supporting --clients, --minutes, and --url.
+// Command line argument parser supporting --clients, --minutes, --url, and --dir.
 function parseArgs() {
   const args = process.argv.slice(2)
   let clients = 60
   let minutes = 2
   let url = 'ws://localhost:8787'
+  let dataDir = path.resolve('data/telemetry')
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]
@@ -27,19 +28,23 @@ function parseArgs() {
       url = args[++i]
     } else if (arg.startsWith('--url=')) {
       url = arg.split('=')[1]
+    } else if (arg === '--dir' && args[i + 1]) {
+      dataDir = path.resolve(args[++i])
+    } else if (arg.startsWith('--dir=')) {
+      dataDir = path.resolve(arg.split('=')[1])
     }
   }
 
-  return { clients, minutes, url }
+  return { clients, minutes, url, dataDir }
 }
 
-const { clients: CLIENT_COUNT, minutes: DURATION_MINUTES, url: SERVER_URL } = parseArgs()
+const { clients: CLIENT_COUNT, minutes: DURATION_MINUTES, url: SERVER_URL, dataDir: DATA_DIR } = parseArgs()
 const DURATION_MS = DURATION_MINUTES * 60 * 1000
 const FLUSH_INTERVAL_MS = 500
-const DATA_DIR = path.resolve('data/telemetry')
 
 // Aggregated metrics across all simulated clients.
-let totalEventsSent = 0
+let totalEventsGenerated = 0
+let totalDeliveryAttempts = 0
 let totalEventsAcked = 0
 const ackLatencies = []
 
@@ -82,6 +87,7 @@ class SimulatedClient {
 
     this.isIdle = false
     this.idleUntil = 0
+    this.generatedEventsCount = 0
   }
 
   start() {
@@ -118,7 +124,8 @@ class SimulatedClient {
       payload,
     }
     this.unackedQueue.push(event)
-    totalEventsSent++
+    this.generatedEventsCount++
+    totalEventsGenerated++
   }
 
   emitCursor() {
@@ -280,22 +287,26 @@ class SimulatedClient {
       sendTime: Date.now(),
     })
 
+    totalDeliveryAttempts += eventsToSend.length
+
     try {
       this.socket.send(JSON.stringify(batch))
     } catch {}
   }
 
+  // Halts future actions and ticks while keeping socket open to drain acknowledgements.
+  stopActivity() {
+    if (this.actionTimer) clearTimeout(this.actionTimer)
+    if (this.cursorTimer) clearInterval(this.cursorTimer)
+    this.actionTimer = null
+    this.cursorTimer = null
+  }
+
   stop() {
     this.disposed = true
+    this.stopActivity()
     if (this.flushTimer) clearInterval(this.flushTimer)
-    if (this.cursorTimer) clearInterval(this.cursorTimer)
-    if (this.actionTimer) clearTimeout(this.actionTimer)
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer)
-
-    // Final flush attempt before closing socket.
-    if (this.unackedQueue.length > 0) {
-      this.flushBatch()
-    }
 
     if (this.socket) {
       try {
@@ -306,15 +317,17 @@ class SimulatedClient {
   }
 }
 
-// Runs verification checks on all generated session files.
-function verifySessionFiles(sessionIds) {
+// Runs verification checks on all generated session files against expected sessions and event counts.
+function verifySessionFiles(expectedManifest) {
   let anyFailure = false
-  console.log(`\n[verify] Running sequence integrity checks on ${sessionIds.length} simulated session file(s)...`)
+  const sessionIds = Object.keys(expectedManifest.sessions)
+  console.log(`\n[verify] Running sequence and manifest integrity checks on ${sessionIds.length} simulated session file(s)...`)
 
   for (const sessionId of sessionIds) {
+    const expected = expectedManifest.sessions[sessionId]
     const file = path.join(DATA_DIR, `${sessionId}.jsonl`)
     if (!fs.existsSync(file)) {
-      console.error(`  [FAIL] ${sessionId}: file not found at ${file}`)
+      console.error(`  [FAIL] ${sessionId}: session file missing from storage (${file})`)
       anyFailure = true
       continue
     }
@@ -325,6 +338,11 @@ function verifySessionFiles(sessionIds) {
       console.error(`  [FAIL] ${sessionId}: file is empty`)
       anyFailure = true
       continue
+    }
+
+    if (lines.length !== expected.totalEvents) {
+      console.error(`  [FAIL] ${sessionId}: count mismatch! expected=${expected.totalEvents}, stored=${lines.length}`)
+      anyFailure = true
     }
 
     const seenSeqs = new Set()
@@ -366,7 +384,12 @@ function verifySessionFiles(sessionIds) {
       if (!seenSeqs.has(s)) seqGaps.push(s)
     }
 
-    const isPass = seqGaps.length === 0 && seqDuplicates.length === 0 && !editVersionDecreased && lines.length > 0
+    if (maxSeq !== expected.maxSeq) {
+      console.error(`  [FAIL] ${sessionId}: maxSeq mismatch! expected=${expected.maxSeq}, stored=${maxSeq}`)
+      anyFailure = true
+    }
+
+    const isPass = seqGaps.length === 0 && seqDuplicates.length === 0 && !editVersionDecreased && lines.length === expected.totalEvents
     if (!isPass) {
       anyFailure = true
       console.error(`  [FAIL] ${sessionId}: gaps=${seqGaps.length}, dupes=${seqDuplicates.length}, versionDecreased=${editVersionDecreased}`)
@@ -381,6 +404,7 @@ async function main() {
   console.log('       Scaffold Telemetry Load Simulator            ')
   console.log('====================================================')
   console.log(`Target URL : ${SERVER_URL}`)
+  console.log(`Target Dir : ${DATA_DIR}`)
   console.log(`Clients    : ${CLIENT_COUNT}`)
   console.log(`Duration   : ${DURATION_MINUTES} minute(s) (${DURATION_MS / 1000}s)`)
   console.log('Starting simulated clients...')
@@ -398,7 +422,7 @@ async function main() {
     const elapsedSec = Math.floor((Date.now() - startTime) / 1000)
     const remainingSec = Math.max(0, Math.floor(DURATION_MS / 1000 - elapsedSec))
     console.log(
-      `[sim] elapsed: ${elapsedSec}s / remaining: ${remainingSec}s | sent: ${totalEventsSent} | acked: ${totalEventsAcked}`,
+      `[sim] elapsed: ${elapsedSec}s / remaining: ${remainingSec}s | gen: ${totalEventsGenerated} | attempts: ${totalDeliveryAttempts} | acked: ${totalEventsAcked}`,
     )
   }, 10000)
 
@@ -406,14 +430,59 @@ async function main() {
   await new Promise((resolve) => setTimeout(resolve, DURATION_MS))
   clearInterval(progressInterval)
 
-  console.log('\nSimulation duration elapsed. Waiting 3s for final batch flushes and acknowledgements...')
-  // Allow remaining buffered events to flush and receive acks.
-  await new Promise((resolve) => setTimeout(resolve, 3000))
+  console.log('\nSimulation duration elapsed. Stopping activity and draining client queues with explicit ack waiting...')
 
-  // Stop all simulated clients.
+  // Halt new event creation across all clients
+  for (const client of clients) {
+    client.stopActivity()
+  }
+
+  // Await queue drain across all clients subject to a 15-second timeout
+  const DRAIN_TIMEOUT_MS = 15000
+  const drainStart = Date.now()
+  let allDrained = false
+
+  while (Date.now() - drainStart < DRAIN_TIMEOUT_MS) {
+    // Trigger immediate batch flush on clients with remaining unacked events
+    for (const client of clients) {
+      if (client.unackedQueue.length > 0) {
+        client.flushBatch()
+      }
+    }
+
+    const pendingSum = clients.reduce((sum, c) => sum + c.unackedQueue.length, 0)
+    if (pendingSum === 0) {
+      allDrained = true
+      break
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200))
+  }
+
+  const outstandingEvents = clients.reduce((sum, c) => sum + c.unackedQueue.length, 0)
+
+  // Stop all simulated clients and close sockets
   for (const client of clients) {
     client.stop()
   }
+
+  // Build the expected manifest mapping each session to exact generated event count and max sequence.
+  const expectedManifest = {
+    generatedAt: new Date().toISOString(),
+    totalClients: CLIENT_COUNT,
+    totalEventsGenerated,
+    sessions: {},
+  }
+
+  for (const client of clients) {
+    expectedManifest.sessions[client.sessionId] = {
+      totalEvents: client.generatedEventsCount,
+      maxSeq: client.seq - 1,
+    }
+  }
+
+  // Save manifest file in target data directory
+  const manifestPath = path.join(DATA_DIR, 'sim-expected-manifest.json')
+  fs.writeFileSync(manifestPath, JSON.stringify(expectedManifest, null, 2), 'utf8')
 
   // Compute percentile and max latency metrics.
   ackLatencies.sort((a, b) => a - b)
@@ -425,16 +494,22 @@ async function main() {
   console.log('                Simulation Results                  ')
   console.log('====================================================')
   console.log(`clients                 : ${CLIENT_COUNT}`)
-  console.log(`total events sent       : ${totalEventsSent}`)
+  console.log(`total events generated  : ${totalEventsGenerated}`)
+  console.log(`total delivery attempts : ${totalDeliveryAttempts}`)
   console.log(`total events acked      : ${totalEventsAcked}`)
+  console.log(`outstanding queue count : ${outstandingEvents}`)
   console.log(`p50 ack latency (ms)    : ${p50}`)
   console.log(`p95 ack latency (ms)    : ${p95}`)
   console.log(`max ack latency (ms)    : ${maxLatency}`)
   console.log('====================================================')
 
-  // Verify all generated session log files.
-  const sessionIds = clients.map((c) => c.sessionId)
-  const allPassed = verifySessionFiles(sessionIds)
+  if (!allDrained) {
+    console.error(`\n[sim] FAIL: Queue drain timed out with ${outstandingEvents} unacknowledged event(s) remaining!`)
+    process.exit(1)
+  }
+
+  // Verify all generated session log files against expected manifest
+  const allPassed = verifySessionFiles(expectedManifest)
 
   if (allPassed) {
     console.log('\nResult: PASS')
