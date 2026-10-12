@@ -91,6 +91,44 @@ Setup: local Ollama, temperature 0.7, linked-list summation problem, 1 sample,
 |---|---|---|---|---|---|---|
 | hardened | list_sum | L1 | 0/1 | 0/1 | 1/1 | 0/1 |
 
+### A8 · Telemetry capture (load and fault tolerance)
+
+Measured on 2026-10-12 on branch `feature/telemetry`.
+
+#### (1) Local load simulation (60 clients, 2 minutes)
+- **Command:** `npm run telemetry:sim -- --clients=60 --minutes=2`
+- **Prerequisite server:** `node tools/telemetry-server/server.mjs`
+- **Date:** 2026-10-12
+- **Clients:** 60 concurrent simulated student sessions
+- **Duration:** 2 minutes (120 s)
+- **Total events sent:** 31,728
+- **Total events acked:** 31,589
+- **Ack round-trip latency (localhost):**
+  - **p50:** 7 ms
+  - **p95:** 25 ms
+  - **max:** 126 ms
+- **Integrity verification (`verifySessionFiles` on all 60 `.jsonl` session files):** PASS (0 gaps, 0 duplicates, monotonic edit version IDs)
+- **Caveat:** Latency was measured on `localhost` loopback; it represents an idealized lower bound on IPC overhead and is not a measurement over the campus network.
+
+#### (2) Chaos fault tolerance simulation (60 clients, 2 minutes, dropped connections)
+- **Command:** `npm run telemetry:sim -- --clients=60 --minutes=2`
+- **Prerequisite server:** `node tools/telemetry-server/server.mjs --chaos` (forcibly closes active WebSocket connections every ~20 s)
+- **Date:** 2026-10-12
+- **Clients:** 60 concurrent simulated student sessions
+- **Duration:** 2 minutes (120 s)
+- **Total events sent:** 31,895
+- **Total events acked:** 31,699
+- **Ack round-trip latency (localhost with reconnects):**
+  - **p50:** 7 ms
+  - **p95:** 25 ms
+  - **max:** 1,099 ms (reflects queue retention and backoff replay during intentional disconnection)
+- **Integrity verification (`verifySessionFiles` on all 60 `.jsonl` session files):** PASS (0 gaps, 0 duplicates, monotonic edit version IDs across all disconnect/reconnect cycles)
+- **Caveat:** Latency was measured on `localhost` loopback; it is a lower bound and not a measurement over the campus network.
+
+#### (3) What is not measured yet
+- **One-hour zero-loss endurance test:** not measured yet (`npm run telemetry:sim -- --clients=60 --minutes=60`).
+- **Campus network latency and packet loss:** not measured yet.
+
 ---
 
 ## B · Published, external — cite, never re-derive

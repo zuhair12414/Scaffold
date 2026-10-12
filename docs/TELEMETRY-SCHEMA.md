@@ -197,3 +197,39 @@ ProgSnap2 is a standardised format for programming process data. The table below
 | `submit` | `Submit` | Formal assignment submission event. |
 | `opt_out` | `TODO check against the ProgSnap2 spec` | Consent preference transition. |
 | `opt_in` | `TODO check against the ProgSnap2 spec` | Consent preference transition. |
+
+---
+
+## 5. For the backend
+
+Requirements for the backend telemetry gateway (Jawad's gateway):
+
+1. **The batch message:**
+   - Accepts WebSocket connections at `/` (or configured gateway route).
+   - Ingests JSON frames with the envelope:
+     ```json
+     {
+       "type": "batch",
+       "sessionId": "string",
+       "events": [ /* array of TelemetryEventRecord objects */ ]
+     }
+     ```
+   - Maintains an in-memory or persisted append log per `sessionId` (e.g. `data/telemetry/<sessionId>.jsonl` or database table).
+
+2. **The ack rule:**
+   - For every batch received from a client, the server responds over the same socket with:
+     ```json
+     {
+       "type": "ack",
+       "sessionId": "string",
+       "upToSeq": 42
+     }
+     ```
+   - `upToSeq` must be the highest integer sequence number $N$ such that **every** event from $1$ through $N$ has been durably stored without any missing sequence gaps.
+   - The client will retain unacknowledged events and truncate its queue up to `upToSeq`.
+
+3. **Deduplication by `seq`:**
+   - Because clients use at-least-once delivery with reconnect replay, batches may contain events already processed in earlier attempts.
+   - The gateway must deduplicate idempotently: ignore any incoming event where `seq` is already recorded for that `sessionId`.
+   - Never write duplicate sequence numbers or overwrite existing records.
+

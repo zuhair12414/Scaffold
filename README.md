@@ -28,6 +28,35 @@ npm run dev
 Open http://localhost:5173 — it lands on the student IDE. Switch roles from the
 header. `/instructor/overview?demo=1` resets to a known-good state first.
 
+## Telemetry
+
+The student IDE captures behavioural telemetry (edit bursts, paste lengths and hashes, throttled cursor movements, focus/blur, idle pauses) and operational milestones (compiler runs, test outcomes, hint requests, submissions) over WebSocket with at-least-once delivery and unacknowledged event replay.
+
+To run the telemetry capture pipeline locally:
+
+1. **Start the ingestion server:**
+   ```bash
+   npm run telemetry:server
+   ```
+   (Listens on `ws://localhost:8787` and appends sessions to `data/telemetry/<sessionId>.jsonl`.)
+
+2. **Start the application:**
+   ```bash
+   npm run dev
+   ```
+   By default, the student editor connects to `ws://localhost:8787`. Set the environment variable `VITE_TELEMETRY_URL` in `.env` or your shell to point the client to a custom WebSocket endpoint (e.g. `VITE_TELEMETRY_URL=ws://10.0.0.42:8787`).
+
+3. **Verify the captured session logs:**
+   ```bash
+   npm run telemetry:verify
+   ```
+   Validates strictly monotonic sequence numbering (`seq` starting at 1 with 0 gaps and 0 duplicates) and increasing edit version IDs.
+
+To simulate concurrent student load against the server:
+```bash
+npm run telemetry:sim -- --clients=60 --minutes=2
+```
+
 ## The two tutors
 
 The tutor header switches between them live; the app opens on **Scaffold tutor**.

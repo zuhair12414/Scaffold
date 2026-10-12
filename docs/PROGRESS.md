@@ -174,11 +174,12 @@ across the six under review.
 
 | Task | State | Checked by |
 |---|---|---|
-| Schema | not started | pending |
-| Editor capture | not started | pending |
-| Transport and test server | not started | pending |
-| Wiring | not started | pending |
-| Status and opt out | not started | pending |
-| Load simulator | not started | pending |
-| Evidence | not started | pending |
+| Schema | done | `src/telemetry/events.ts`, `docs/TELEMETRY-SCHEMA.md`, oxlint + build |
+| Editor capture | done | `src/telemetry/captureEditor.ts`, `CodeEditor.tsx`, throttled cursor, paste hashing |
+| Transport and test server | done | `WebSocketSink.ts`, `server.mjs`, `verify.mjs`, batching and sequence ack |
+| Wiring | done | `StudentIde.tsx`, operational events (`compile`, `run`, `hint_request`, `hint_shown`, `submit`, `session_start`) |
+| Status and opt out | done | `Header.tsx`, `StatusBar.tsx`, live pending count, behavioural opt-out switch |
+| Load simulator | done | `tools/telemetry-sim/sim.mjs`, `npm run telemetry:sim` (60 clients, normal + chaos PASS) |
+| Evidence | done | `docs/EVIDENCE.md` section A8 with exact commands, dates, and unmeasured qualifiers |
+
 
