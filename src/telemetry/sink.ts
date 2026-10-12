@@ -10,6 +10,9 @@ import type {
 // Destination interface for consuming telemetry events.
 export interface TelemetrySink {
   emit(event: TelemetryEventRecord): void
+  // Optional filter predicate: returns true if the sink will reject/drop this event type.
+  // When shouldDrop returns true, createEmitter will NOT allocate a sequence number.
+  shouldDrop?(type: TelemetryEventType): boolean
 }
 
 // Development sink that outputs formatted telemetry events to the browser console.
@@ -40,6 +43,12 @@ export function createEmitter(
     type: K,
     payload: PayloadMap[K],
   ): void {
+    // If the sink will drop this event (e.g. behavioural event while opted out),
+    // return immediately WITHOUT allocating a sequence number.
+    if (sink.shouldDrop && sink.shouldDrop(type)) {
+      return
+    }
+
     const ctx = typeof contextOrGetter === 'function' ? contextOrGetter() : contextOrGetter
     const event = {
       sessionId: ctx.sessionId,

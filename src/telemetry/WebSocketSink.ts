@@ -67,6 +67,11 @@ export class WebSocketSink implements TelemetrySink {
     }
   }
 
+  // Indicates whether this sink will reject/drop this event type under current state.
+  shouldDrop(type: string): boolean {
+    return this.isOptedOut && (BEHAVIOURAL_TYPES as readonly string[]).includes(type as any)
+  }
+
   // Submits a new event record into the transmission pipeline.
   emit(event: TelemetryEventRecord): void {
     // Drop behavioural events immediately if opt-out is enabled.
@@ -75,10 +80,17 @@ export class WebSocketSink implements TelemetrySink {
     }
 
     // Check buffer limit to prevent uncontrolled memory exhaustion.
+    // If capacity is reached, reject new behavioural events to avoid dropping already-numbered
+    // events which would introduce sequence gaps. Only drop oldest if buffer is completely filled
+    // with operational events, maintaining explicit overflow accounting.
     if (this.unackedQueue.length >= MAX_BUFFER_CAPACITY) {
-      // Drop the oldest unacknowledged event to keep fresh telemetry.
-      this.unackedQueue.shift()
       this.overflowCount++
+      // If the incoming event is behavioural, reject it to protect assigned sequences.
+      if ((BEHAVIOURAL_TYPES as readonly string[]).includes(event.type)) {
+        return
+      }
+      // If buffer has reached capacity, drop oldest to make room for critical operational milestone.
+      this.unackedQueue.shift()
     }
 
     this.unackedQueue.push(event)
@@ -117,12 +129,9 @@ export class WebSocketSink implements TelemetrySink {
       // Ignore storage access errors.
     }
 
-    if (optOut) {
-      // Prune any existing behavioural events waiting in the queue.
-      this.unackedQueue = this.unackedQueue.filter(
-        (e) => !(BEHAVIOURAL_TYPES as readonly string[]).includes(e.type),
-      )
-    }
+    // Note: Do NOT prune events already numbered and queued in unackedQueue,
+    // because that would create sequence gaps blocking server upToSeq acknowledgements.
+    // Pre-existing queued events are flushed, while all future behavioural capture is halted.
     this.notifyStatus()
   }
 
@@ -189,10 +198,26 @@ export class WebSocketSink implements TelemetrySink {
     if (typeof data !== 'string') return
     try {
       const msg = JSON.parse(data)
-      if (msg && msg.type === 'ack' && typeof msg.upToSeq === 'number') {
+      if (
+        msg &&
+        msg.type === 'ack' &&
+        typeof msg.upToSeq === 'number' &&
+        msg.upToSeq >= 0 &&
+        typeof msg.sessionId === 'string'
+      ) {
+        // Only validate and trim if the acknowledgement targets the active queue's session.
+        if (this.unackedQueue.length === 0) return
+        const activeSessionId = this.unackedQueue[0].sessionId
+        if (msg.sessionId !== activeSessionId) {
+          // Reject stale or mismatched session acknowledgement.
+          return
+        }
+
         const upToSeq = msg.upToSeq
-        // Remove every event whose seq is less than or equal to upToSeq.
-        this.unackedQueue = this.unackedQueue.filter((e) => e.seq > upToSeq)
+        // Remove events in this session whose seq is less than or equal to upToSeq.
+        this.unackedQueue = this.unackedQueue.filter(
+          (e) => !(e.sessionId === activeSessionId && e.seq <= upToSeq),
+        )
         this.notifyStatus()
       }
     } catch {
