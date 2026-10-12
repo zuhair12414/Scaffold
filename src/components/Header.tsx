@@ -44,7 +44,7 @@ export function Header({
               <span>Share behaviour data</span>
             </label>
             <span style={{ fontSize: 10, color: 'var(--faint)' }}>
-              Turning this off stops edit, paste, cursor, focus and idle capture. Hints still work.
+              Stops new edit, paste, cursor, focus and idle capture. Data already queued may still be sent. Hints still work.
             </span>
           </div>
         )}

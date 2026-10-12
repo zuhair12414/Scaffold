@@ -173,10 +173,10 @@ In accordance with ethics guidelines and the project specification:
 3. **Chat and prompt text:** Student-entered questions, prompts, and assistant response texts are **never** transmitted in telemetry streams. Only disclosure levels, trigger reasons, and latency metrics are logged.
 4. **Student credentials & campus identifiers:** Passwords, student emails, and external network identifiers are excluded.
 5. **Opt-out compliance & sequence continuity:** When a student opts out of telemetry:
-   - Behavioral editor listeners and idle timers are completely detached/suspended at the sensor layer.
-   - Pre-opt-out queued events drain normally to prevent sequence disruption.
-   - Any behavioral events presented during opt-out are discarded before sequence allocation (`shouldDrop`), guaranteeing that transmitted sequences remain strictly contiguous and monotonic (`1..N`).
-   - Non-behavioural operational milestones (`compile`, `run`, `submit`, `opt_out`, `opt_in`) continue to be transmitted with seamless, gap-free sequence acknowledgement.
+   - Behavioral editor listeners and idle timers are immediately detached/suspended at the Monaco sensor layer (`CodeEditor.tsx`), halting any further behavioural event creation.
+   - Any behavioral events already queued in memory prior to the opt-out toggle remain in `unackedQueue` and are permitted to finish draining to the server. This guarantees that sequence numbers on the wire remain contiguous (`1..N`) and prevents server acknowledgement deadlocks.
+   - Any subsequent behavioral events presented during opt-out are discarded before sequence allocation (`shouldDrop`), consuming zero sequence numbers.
+   - Non-behavioural operational milestones (`compile`, `run`, `submit`, `opt_out`, `opt_in`) continue to be captured and transmitted with gap-free sequence acknowledgement.
 
 ---
 
