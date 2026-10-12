@@ -501,6 +501,7 @@ export default function StudentIde() {
             lite={LITE}
             path={`${p.id}.cpp`}
             telemetry={telemetryEmitter}
+            optedOut={optedOut}
           />
           {outputOpen && run && (
             <OutputPanel

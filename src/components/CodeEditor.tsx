@@ -20,9 +20,11 @@ type Props = {
   path?: string
   // Optional telemetry emitter for capturing student editor interactions.
   telemetry?: TelemetryEmitFn
+  // Flag indicating if behavioral capture is opted out.
+  optedOut?: boolean
 }
 
-export function CodeEditor({ value, onChange, onCursor, highlight, actions, lite = false, path = 'main.cpp', telemetry }: Props) {
+export function CodeEditor({ value, onChange, onCursor, highlight, actions, lite = false, path = 'main.cpp', telemetry, optedOut = false }: Props) {
   const edRef = useRef<Ed | null>(null)
   const decos = useRef<ReturnType<Ed['createDecorationsCollection']> | null>(null)
   const captureCleanup = useRef<(() => void) | null>(null)
@@ -47,9 +49,19 @@ export function CodeEditor({ value, onChange, onCursor, highlight, actions, lite
     ed.addCommand(K.CtrlCmd | C.KeyJ, () => actions.current.toggleOutput())
     ed.addCommand(K.CtrlCmd | K.Shift | C.KeyS, () => actions.current.snooze())
     ed.focus()
+  }
 
-    if (telemetry) {
-      // Programmatic edits occur when parent passes a new value not originating from typing (e.g. question switch, demo fill).
+  // Reactively attach or dispose telemetry capture when opt-out preference or telemetry callback changes.
+  useEffect(() => {
+    const ed = edRef.current
+    // Clean up existing capture listeners if any
+    if (captureCleanup.current) {
+      captureCleanup.current()
+      captureCleanup.current = null
+    }
+
+    // Attach listeners ONLY when telemetry is provided AND student has NOT opted out
+    if (ed && telemetry && !optedOut) {
       const isProgramEdit = () => {
         const model = ed.getModel()
         const currentModelText = model ? model.getValue() : ''
@@ -58,17 +70,14 @@ export function CodeEditor({ value, onChange, onCursor, highlight, actions, lite
       const capture = attachEditorCapture(ed, monaco, telemetry, isProgramEdit)
       captureCleanup.current = capture.dispose
     }
-  }
 
-  useEffect(() => {
     return () => {
-      // Clean up telemetry listeners when editor unmounts.
       if (captureCleanup.current) {
         captureCleanup.current()
         captureCleanup.current = null
       }
     }
-  }, [])
+  }, [telemetry, optedOut])
 
   useEffect(() => {
     if (!decos.current) return
