@@ -15,10 +15,11 @@ import { useCourse } from './state/useCourse'
 import { ManualViewer } from './components/ManualViewer'
 import { mockData } from './mock/data'
 import { notify } from './state/toast'
-import type { ChatTurn, ContextMode, HintResponse, KnowledgeComponentId, Level, ManualMeta, ProfileMode, PromptVariant, StruggleSignal, TelemetryEvent } from './types'
+import type { ChatTurn, ContextMode, HintResponse, KnowledgeComponentId, Level, ManualMeta, ProfileMode, PromptVariant, StruggleSignal } from './types'
 import prompts from './providers/prompts.json'
 import { createEmitter } from './telemetry/sink'
 import { WebSocketSink } from './telemetry/WebSocketSink'
+import { SCHEMA_VERSION, type PayloadMap, type TelemetryEventType } from './telemetry/events'
 
 const PROBLEM = 'P02'
 const SNOOZE_MS = 10 * 60_000
@@ -174,7 +175,6 @@ export default function StudentIde() {
     }
   }, [pushedLabId, navigate])
 
-  const telemetry = useRef<TelemetryEvent[]>([])
   const nextId = useRef(1)
 
   // One session ID per browser session for telemetry envelope.
@@ -182,7 +182,7 @@ export default function StudentIde() {
   const activeLabId = activeLab?.id ?? ''
   const activeQId = activeQuestion?.id ?? p.id
 
-  // Active context ref so emitter always sees the latest labId and questionId.
+  // Active telemetry context ref.
   const contextRef = useRef({
     sessionId,
     studentId: DEMO_STUDENT_ID,
@@ -200,13 +200,41 @@ export default function StudentIde() {
   }, [sessionId, activeLabId, activeQId])
 
   // WebSocket network sink for transmitting typed telemetry events to ingestion server.
-  const [telemetryEmitter] = useState(() => {
-    return createEmitter(() => contextRef.current, new WebSocketSink())
-  })
+  const emitterRef = useRef<ReturnType<typeof createEmitter> | null>(null)
 
-  const log = useCallback((kind: TelemetryEvent['kind'], payload: Record<string, unknown> = {}) => {
-    telemetry.current.push({ t: new Date().toISOString(), kind, payload })
+  useEffect(() => {
+    if (!emitterRef.current) {
+      const emitter = createEmitter(() => contextRef.current, new WebSocketSink())
+      emitterRef.current = emitter
+      emitter('session_start', { schemaVersion: SCHEMA_VERSION })
+    }
   }, [])
+
+  const telemetryEmitter = useCallback(<K extends TelemetryEventType>(
+    type: K,
+    payload: PayloadMap[K],
+  ) => {
+    if (emitterRef.current) {
+      emitterRef.current(type, payload)
+    }
+  }, [])
+
+  // Emits compile and run events from a single helper to simplify replacing mockRun with a real sandbox later.
+  const emitRunEvents = useCallback((r: RunResult) => {
+    const errorCount = r.diagnostics.filter((d) => d.severity === 'error').length
+    const warningCount = r.diagnostics.filter((d) => d.severity === 'warning').length
+    const errorClasses = r.diagnostics.map((d) => d.cls)
+    telemetryEmitter('compile', {
+      ok: r.ok,
+      errorCount,
+      warningCount,
+      errorClasses,
+    })
+
+    const passed = r.tests.filter((t) => t.passed).length
+    const failed = r.tests.length - passed
+    telemetryEmitter('run', { passed, failed })
+  }, [telemetryEmitter])
 
   const struggle: StruggleSignal = useMemo(() => ({
     state: failedRuns >= 2 ? 'unproductive' : failedRuns === 1 ? 'productive' : 'flow',
@@ -228,7 +256,11 @@ export default function StudentIde() {
   const submit = useCallback(() => {
     if (!activeLab) return
     const result = run ?? mockRun(code, p)
-    if (!run) { setRun(result); setOutputOpen(true) }
+    if (!run) {
+      setRun(result)
+      setOutputOpen(true)
+      emitRunEvents(result)
+    }
     const passed = result.tests.filter((test) => test.passed).length
     submitAttempt({
       studentId: DEMO_STUDENT_ID,
@@ -240,18 +272,19 @@ export default function StudentIde() {
       testsFailed: result.tests.length - passed,
       timeOnTaskMin: Math.max(1, Math.round((Date.now() - (startedAt.current?.value || Date.now())) / 60_000)),
     })
-    log('submit', { labId: activeLab.id, testsPassed: passed })
+    telemetryEmitter('submit', { testsPassed: passed })
     notify(`Attempt submitted: ${passed} of ${result.tests.length} tests passed. Your instructor can see it.`)
     setSubmitState('saved')
     window.setTimeout(() => setSubmitState('idle'), 2500)
-  }, [activeLab, code, p, run, submitAttempt, log, setRun, setOutputOpen, setSubmitState])
+  }, [activeLab, code, p, run, submitAttempt, telemetryEmitter, emitRunEvents, setRun, setOutputOpen, setSubmitState])
 
   const requestHint = useCallback(async (level: Level, trigger: HintCard['trigger'], question?: string) => {
     const requestedLevel = Math.min(level, maxHintLevel) as Level
     setTutorOpen(true)
     setNudge('idle')
     setThinking(true)
-    log('hint', { level: requestedLevel, trigger, question })
+    telemetryEmitter('hint_request', { level: requestedLevel, trigger })
+    const hintStartTime = Date.now()
     const id = nextId.current++
     const isBaseline = true
     if (isBaseline) {
@@ -272,6 +305,12 @@ export default function StudentIde() {
       return
     }
     setThinking(false)
+    const latencyMs = Date.now() - hintStartTime
+    telemetryEmitter('hint_shown', {
+      level: res.level,
+      blocked: Boolean(res.guardrail?.blocked),
+      latencyMs,
+    })
     setCards((cs) => (cs.some((c) => c.id === id)
       ? cs.map((c) => (c.id === id ? { ...c, ...res, streaming: false, question } : c))
       : [...cs, { ...res, id, trigger }]))
@@ -292,7 +331,7 @@ export default function StudentIde() {
       })
     }
     if (res.highlightLines) setHighlight({ lines: res.highlightLines, message: res.text })
-  }, [code, mastery, struggle, p, log, appendChat, activeLab, promptVariant, systemPrompt, model, context, profile, maxHintLevel, provider, similarityThreshold, setCards, setHighlight])
+  }, [code, mastery, struggle, p, telemetryEmitter, appendChat, activeLab, promptVariant, systemPrompt, model, context, profile, maxHintLevel, provider, similarityThreshold, setCards, setHighlight])
 
   const policyLevel = useCallback((): Level => {
     const level = cards.length ? currentLevel : failedRuns >= 3 ? 1 : 0
@@ -304,19 +343,20 @@ export default function StudentIde() {
     setRun(r)
     setOutputOpen(true)
     setTab(r.diagnostics.length ? 'diagnostics' : 'tests')
-    log('run', { ok: r.ok, diagnostics: r.diagnostics.length })
+    emitRunEvents(r)
     r.diagnostics.forEach((d) => {
       if (!explanations[d.cls]) provider.explainDiagnostic(d).then((t) => setExplanations((e) => ({ ...e, [d.cls]: t })))
     })
     if (r.ok) { setHighlight(null); setFailedRuns(0); setNudge('idle'); return }
     const n = failedRuns + 1
     setFailedRuns(n)
-  }, [code, p, failedRuns, explanations, log, provider, setRun, setOutputOpen, setHighlight])
+  }, [code, p, failedRuns, explanations, emitRunEvents, provider, setRun, setOutputOpen, setHighlight])
 
   const snooze = useCallback(() => {
-    setNudge('snoozed'); log('snooze')
+    setNudge('snoozed')
+    telemetryEmitter('snooze', undefined)
     setTimeout(() => setNudge((s) => (s === 'snoozed' ? 'idle' : s)), SNOOZE_MS)
-  }, [log])
+  }, [telemetryEmitter])
 
   const actions = useRef<EditorActions>({
     run: () => {},
@@ -419,7 +459,7 @@ export default function StudentIde() {
         <div className="center">
           <CodeEditor
             value={code}
-            onChange={(v) => { setCode(v); log('edit', { len: v.length }) }}
+            onChange={(v) => setCode(v)}
             onCursor={(ln, col) => setCursor({ ln, col })}
             highlight={highlight}
             actions={actions}

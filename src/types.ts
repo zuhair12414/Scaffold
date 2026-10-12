@@ -70,12 +70,6 @@ export type TestResult = {
   hidden: boolean
 }
 
-export type TelemetryEvent = {
-  t: string
-  kind: 'edit' | 'run' | 'paste' | 'idle' | 'hint' | 'escalate' | 'snooze' | 'submit'
-  payload: Record<string, unknown>
-}
-
 export type KnowledgeComponentId =
   | 'array-pointer-basics'
   | 'linked-list-traversal'

@@ -30,7 +30,7 @@ export interface TelemetryContext {
 
 // Creates an emit helper that enriches events with sequence numbers and context headers.
 export function createEmitter(
-  getContext: () => TelemetryContext,
+  contextOrGetter: TelemetryContext | (() => TelemetryContext),
   sink: TelemetrySink = new ConsoleSink(),
 ) {
   // Sequence counter begins at 1 and increases monotonically.
@@ -40,7 +40,7 @@ export function createEmitter(
     type: K,
     payload: PayloadMap[K],
   ): void {
-    const ctx = getContext()
+    const ctx = typeof contextOrGetter === 'function' ? contextOrGetter() : contextOrGetter
     const event = {
       sessionId: ctx.sessionId,
       seq: currentSeq++,
