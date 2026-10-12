@@ -3,7 +3,30 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-const targetArg = process.argv[2] || 'data/telemetry'
+// Parse CLI arguments:
+// node verify.mjs [targetDirOrFile] [--manifest=path] [--min-sessions=N] [--allow-empty]
+const args = process.argv.slice(2)
+let targetArg = 'data/telemetry'
+let manifestPath = null
+let minSessions = 0
+let allowEmpty = false
+
+for (const arg of args) {
+  if (arg.startsWith('--manifest=')) {
+    manifestPath = path.resolve(arg.split('=')[1])
+  } else if (arg === '--manifest' && args[args.indexOf(arg) + 1]) {
+    manifestPath = path.resolve(args[args.indexOf(arg) + 1])
+  } else if (arg.startsWith('--min-sessions=')) {
+    minSessions = Number(arg.split('=')[1])
+  } else if (arg === '--min-sessions' && args[args.indexOf(arg) + 1]) {
+    minSessions = Number(args[args.indexOf(arg) + 1])
+  } else if (arg === '--allow-empty') {
+    allowEmpty = true
+  } else if (!arg.startsWith('--') && targetArg === 'data/telemetry') {
+    targetArg = arg
+  }
+}
+
 const resolvedPath = path.resolve(targetArg)
 
 if (!fs.existsSync(resolvedPath)) {
@@ -22,9 +45,36 @@ if (stat.isDirectory()) {
   files = [resolvedPath]
 }
 
+// Load manifest expectations if provided.
+// Manifest format: JSON { sessions: { [sessionId]: { totalEvents: N, maxSeq: M, eventIds?: [...] } } }
+let manifest = null
+if (manifestPath) {
+  if (!fs.existsSync(manifestPath)) {
+    console.error(`[verify] Manifest file not found: ${manifestPath}`)
+    process.exit(1)
+  }
+  try {
+    manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+    console.log(`[verify] Loaded expectation manifest with ${Object.keys(manifest.sessions || {}).length} session(s)`)
+  } catch (err) {
+    console.error(`[verify] Failed to parse manifest ${manifestPath}:`, err.message)
+    process.exit(1)
+  }
+}
+
 if (files.length === 0) {
-  console.log('[verify] No .jsonl files found to verify.')
-  process.exit(0)
+  if (allowEmpty) {
+    console.log('[verify] No .jsonl files found (allowed via --allow-empty). Result: PASS')
+    process.exit(0)
+  } else {
+    console.error('[verify] FAIL: No .jsonl files found to verify in target directory. Set --allow-empty if intentional.')
+    process.exit(1)
+  }
+}
+
+if (minSessions > 0 && files.length < minSessions) {
+  console.error(`[verify] FAIL: Expected at least ${minSessions} session(s), but found only ${files.length}.`)
+  process.exit(1)
 }
 
 let anyFailure = false
@@ -116,11 +166,31 @@ for (const file of files) {
   if (hasDupes) {
     console.log(`  [FAIL] Duplicate sequence numbers: ${seqDuplicates.slice(0, 10).join(', ')}`)
   }
-  if (editVersionDecreased) {
-    console.log(`  [FAIL] Edit versionId decreased during session.`)
+  // If a manifest was provided, reconcile this session against expected records.
+  if (manifest && manifest.sessions && manifest.sessions[sessionId]) {
+    const expected = manifest.sessions[sessionId]
+    if (typeof expected.totalEvents === 'number' && lines.length !== expected.totalEvents) {
+      console.log(`  [FAIL] Manifest mismatch: expected ${expected.totalEvents} events, but stored ${lines.length}`)
+      anyFailure = true
+    }
+    if (typeof expected.maxSeq === 'number' && maxSeq !== expected.maxSeq) {
+      console.log(`  [FAIL] Manifest mismatch: expected maxSeq ${expected.maxSeq}, but stored ${maxSeq}`)
+      anyFailure = true
+    }
   }
 
   console.log(`Result: ${isPass ? 'PASS' : 'FAIL'}\n`)
+}
+
+// If a manifest was provided, verify that all expected sessions actually had log files on disk.
+if (manifest && manifest.sessions) {
+  const verifiedSessionIds = new Set(files.map((f) => path.basename(f, '.jsonl')))
+  for (const expectedSessionId of Object.keys(manifest.sessions)) {
+    if (!verifiedSessionIds.has(expectedSessionId)) {
+      console.error(`[verify] FAIL: Expected session '${expectedSessionId}' is completely missing from storage!`)
+      anyFailure = true
+    }
+  }
 }
 
 if (anyFailure) {

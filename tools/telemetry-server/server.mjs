@@ -6,7 +6,14 @@ import path from 'node:path'
 import { WebSocketServer } from 'ws'
 
 const PORT = Number(process.env.PORT) || 8787
-const DATA_DIR = path.resolve('data/telemetry')
+let DATA_DIR = path.resolve(process.env.TELEMETRY_DIR || 'data/telemetry')
+for (let i = 2; i < process.argv.length; i++) {
+  if (process.argv[i] === '--dir' && process.argv[i + 1]) {
+    DATA_DIR = path.resolve(process.argv[++i])
+  } else if (process.argv[i].startsWith('--dir=')) {
+    DATA_DIR = path.resolve(process.argv[i].split('=')[1])
+  }
+}
 const isChaos = process.argv.includes('--chaos')
 
 // Ensure destination directory exists.
