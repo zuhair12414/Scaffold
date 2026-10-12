@@ -175,11 +175,11 @@ across the six under review.
 | Task | State | Checked by |
 |---|---|---|
 | Schema | done | `src/telemetry/events.ts`, `docs/TELEMETRY-SCHEMA.md`, oxlint + build |
-| Editor capture | done | `src/telemetry/captureEditor.ts`, `CodeEditor.tsx`, throttled cursor, paste hashing |
-| Transport and test server | done | `WebSocketSink.ts`, `server.mjs`, `verify.mjs`, batching and sequence ack |
+| Editor capture | done | `src/telemetry/captureEditor.ts`, `CodeEditor.tsx`, reactive opt-out unbinding, throttled cursor |
+| Transport and test server | done | `WebSocketSink.ts`, `server.mjs`, `verify.mjs`, contiguous acks, shouldDrop zero-gap filtering |
 | Wiring | done | `StudentIde.tsx`, operational events (`compile`, `run`, `hint_request`, `hint_shown`, `submit`, `session_start`) |
-| Status and opt out | done | `Header.tsx`, `StatusBar.tsx`, live pending count, behavioural opt-out switch |
-| Load simulator | done | `tools/telemetry-sim/sim.mjs`, `npm run telemetry:sim` (60 clients, normal + chaos PASS) |
-| Evidence | done | `docs/EVIDENCE.md` section A8 with exact commands, dates, and unmeasured qualifiers |
+| Status and opt out | done | `Header.tsx`, `StatusBar.tsx`, live pending count, behavioural opt-out switch & sensor unbinding |
+| Load simulator | done | `tools/telemetry-sim/sim.mjs`, manifest reconciliation, bounded drain timeout, normal + chaos PASS |
+| Evidence | done | `docs/EVIDENCE.md` section A8 with manifest verification, delivery attempts vs acks, and reproducible commands |
 
 
