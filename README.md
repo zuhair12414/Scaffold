@@ -46,6 +46,13 @@ Set `VITE_OLLAMA_MODEL` in a `.env.local` to try another model. If the configure
 falls back to the first model Ollama has and says so on the card. Set `VITE_TUTOR_MODE=scaffold` to see the
 mocked Scaffold ladder instead.
 
+## Student model
+
+Mastery comes from a `StudentModel` (`src/student/`). The default, `static`, keeps the fixed per-problem
+values. Set `VITE_STUDENT_MODEL=bkt` in `.env.local` to have mastery update after every Run with Bayesian
+Knowledge Tracing. DKT will plug into the same interface; offline training code lives in `kt/`. See
+`docs/student-model.md` and `docs/architecture.md`.
+
 ## Live demo and evidence
 
 See `~/Documents/Scaffold/Scaffold_Live_Demo_Runbook.md`. `spike/demo.sh` runs a one-minute live leakage check;
