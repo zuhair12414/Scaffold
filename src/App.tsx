@@ -6,6 +6,9 @@ import { OutputPanel } from './components/OutputPanel'
 import { TutorPanel, type HintCard } from './components/TutorPanel'
 import { StatusBar, type Nudge } from './components/StatusBar'
 import { problems } from './data/problems'
+import { conceptsFor } from './data/qmatrix'
+import { createStudentModel } from './student'
+import { detectStruggle } from './telemetry/struggle'
 import { mockRun, type RunResult } from './mock/compiler'
 import { MockHintProvider } from './providers/MockHintProvider'
 import { OllamaBaselineProvider } from './providers/OllamaBaselineProvider'
@@ -55,13 +58,12 @@ export default function App() {
     telemetry.current.push({ t: new Date().toISOString(), kind, payload })
   }, [])
 
-  const struggle: StruggleSignal = useMemo(() => ({
-    state: failedRuns >= 2 ? 'unproductive' : failedRuns === 1 ? 'productive' : 'flow',
-    since: new Date().toISOString(),
-    evidence: failedRuns ? [`${failedRuns} failed runs, same warning class`] : [],
-  }), [failedRuns])
-
-  const mastery = useMemo(() => Object.fromEntries(p.concepts.map((c) => [c.name.toLowerCase(), c.mastery])), [p])
+  // Student model: static by default, VITE_STUDENT_MODEL=bkt makes mastery move with each run.
+  const [studentModel] = useState(() => createStudentModel(
+    import.meta.env.VITE_STUDENT_MODEL,
+    Object.fromEntries(p.concepts.map((c) => [c.name.toLowerCase(), c.mastery])),
+  ))
+  const [mastery, setMastery] = useState(() => studentModel.mastery())
   const currentLevel: Level = cards.length ? cards[cards.length - 1].level : 0
 
   // Escalation gate: one level per edit or run, plus a cooldown.
@@ -91,6 +93,7 @@ export default function App() {
     if (isBaseline) {
       setCards((cs) => [...cs, { id, trigger, level: 0, text: '', source: 'baseline', model, promptVariant, context, profile, streaming: true, question, guardrail: { leaked: false, stripped: false } }])
     }
+    const struggle: StruggleSignal = detectStruggle({ failedRuns, events: telemetry.current })
     let res: HintResponse
     try {
       res = await provider.requestHint(
@@ -112,7 +115,7 @@ export default function App() {
     if (res.highlightLines) setHighlight({ lines: res.highlightLines, message: res.text })
     setLastHintAt(Date.now())
     setActivitySinceHint(false)
-  }, [code, mastery, struggle, p.id, log, promptVariant, systemPrompt, model, context, profile])
+  }, [code, mastery, failedRuns, p.id, log, promptVariant, systemPrompt, model, context, profile])
 
   const policyLevel = (): Level => (cards.length ? currentLevel : failedRuns >= 3 ? 1 : 0)
 
@@ -123,6 +126,14 @@ export default function App() {
     setTab(r.diagnostics.length ? 'diagnostics' : 'tests')
     setActivitySinceHint(true)
     log('run', { ok: r.ok, diagnostics: r.diagnostics.length })
+    setMastery(studentModel.record({
+      problemId: p.id,
+      concepts: conceptsFor(p.id),
+      correct: r.ok,
+      t: new Date().toISOString(),
+      testsPassed: r.tests.filter((t) => t.passed).length,
+      testsTotal: r.tests.length,
+    }))
     r.diagnostics.forEach((d) => {
       if (!explanations[d.cls]) provider.explainDiagnostic(d).then((t) => setExplanations((e) => ({ ...e, [d.cls]: t })))
     })
@@ -130,7 +141,7 @@ export default function App() {
     const n = failedRuns + 1
     setFailedRuns(n)
     if (MODE === 'scaffold' && n >= 2 && !tutorOpen && Date.now() > snoozedUntil && nudge !== 'nudge') setNudge('nudge')
-  }, [code, p, failedRuns, tutorOpen, snoozedUntil, nudge, explanations, log])
+  }, [code, p, failedRuns, tutorOpen, snoozedUntil, nudge, explanations, log, studentModel])
 
   const snooze = useCallback(() => {
     setSnoozedUntil(Date.now() + SNOOZE_MS); setNudge('snoozed'); log('snooze')
